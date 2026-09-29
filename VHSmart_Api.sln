@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35931.197
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VHSmart_Api", "VHSmart_Api\VHSmart_Api.csproj", "{6F40828B-B243-46B9-B0D1-713A6CB81684}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VHSmart_Api.Tests", "VHSmart_Api.Tests\VHSmart_Api.Tests.csproj", "{3D3ECE3C-A03B-40DF-9ACC-1EDAC9B430AF}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6F40828B-B243-46B9-B0D1-713A6CB81684}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F40828B-B243-46B9-B0D1-713A6CB81684}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F40828B-B243-46B9-B0D1-713A6CB81684}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F40828B-B243-46B9-B0D1-713A6CB81684}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3D3ECE3C-A03B-40DF-9ACC-1EDAC9B430AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3D3ECE3C-A03B-40DF-9ACC-1EDAC9B430AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3D3ECE3C-A03B-40DF-9ACC-1EDAC9B430AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3D3ECE3C-A03B-40DF-9ACC-1EDAC9B430AF}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8B4957FB-8C90-40FF-B75C-1B08B6FBD71F}
+	EndGlobalSection
+EndGlobal

@@ -18,6 +18,9 @@ public class TestTenantRecord : BaseClass, ITenantEntity
 public class TestGlobalRecord : BaseClass
 {
     public string Name { get; set; } = string.Empty;
+
+    // Nullable column, so search/sort code is exercised against null values too.
+    public string? Note { get; set; }
 }
 
 public sealed class TestCurrentUser(

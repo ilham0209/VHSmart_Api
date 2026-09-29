@@ -16,8 +16,8 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<VHSmartDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("VHSmart")));
 
-// Task F-03 replaces this with the implementation read from the JWT claims.
-builder.Services.AddScoped<ICurrentUser, SystemCurrentUser>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, JwtCurrentUser>();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();

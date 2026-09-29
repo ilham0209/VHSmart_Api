@@ -7,6 +7,8 @@ public interface ICurrentUser
 
     Guid CompanyId { get; }
 
+    Guid RoleId { get; }
+
     bool IsPlatformAdmin { get; }
 
     bool ViewAllCompanies { get; }

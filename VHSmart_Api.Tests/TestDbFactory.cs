@@ -23,12 +23,15 @@ public class TestGlobalRecord : BaseClass
 public sealed class TestCurrentUser(
     string userId,
     Guid companyId,
+    Guid roleId = default,
     bool isPlatformAdmin = false,
     bool viewAllCompanies = false) : ICurrentUser
 {
     public string UserId { get; } = userId;
 
     public Guid CompanyId { get; } = companyId;
+
+    public Guid RoleId { get; } = roleId;
 
     public bool IsPlatformAdmin { get; } = isPlatformAdmin;
 

@@ -1,6 +1,8 @@
 using System.Net;
+using MediatR;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using VHSmart_Api.Shared.Infrastructure.Behavior;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
@@ -42,4 +44,15 @@ public class SmokeTests : IClassFixture<WebApplicationFactory<Program>>
 
         Assert.IsType<JwtCurrentUser>(user);
     }
+
+    [Fact]
+    public void ServiceProvider_WhenBuilt_RegistersValidationBehavior()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var behaviors = scope.ServiceProvider.GetServices<IPipelineBehavior<PingRequest, string>>();
+
+        Assert.Contains(behaviors, behavior => behavior is ValidationBehavior<PingRequest, string>);
+    }
+
+    private sealed record PingRequest(string Message);
 }

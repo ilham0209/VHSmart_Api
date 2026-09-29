@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using VHSmart_Api.Shared.Infrastructure.Behavior;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
+using VHSmart_Api.Shared.Infrastructure.Storage;
 
 namespace VHSmart_Api.Tests;
 
@@ -52,6 +53,12 @@ public class SmokeTests : IClassFixture<WebApplicationFactory<Program>>
         var behaviors = scope.ServiceProvider.GetServices<IPipelineBehavior<PingRequest, string>>();
 
         Assert.Contains(behaviors, behavior => behavior is ValidationBehavior<PingRequest, string>);
+    }
+
+    [Fact]
+    public void ServiceProvider_WhenBuilt_ResolvesFileStorage()
+    {
+        Assert.IsType<LocalFileStorage>(_factory.Services.GetRequiredService<IFileStorage>());
     }
 
     private sealed record PingRequest(string Message);

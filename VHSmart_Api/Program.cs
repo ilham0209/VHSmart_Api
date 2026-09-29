@@ -8,6 +8,7 @@ using Scalar.AspNetCore;
 using VHSmart_Api.Shared.Infrastructure.Behavior;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
+using VHSmart_Api.Shared.Infrastructure.Storage;
 using VHSmart_Api.Shared.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -24,6 +25,15 @@ builder.Services.AddScoped<ICurrentUser, JwtCurrentUser>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
+// Relative FileStorage:RootPath is resolved against the content root; the storage root is
+// created lazily on the first upload.
+var fileStorageRoot = builder.Configuration["FileStorage:RootPath"];
+if (string.IsNullOrWhiteSpace(fileStorageRoot))
+    fileStorageRoot = "App_Data/Files";
+if (!Path.IsPathRooted(fileStorageRoot))
+    fileStorageRoot = Path.Combine(builder.Environment.ContentRootPath, fileStorageRoot);
+builder.Services.AddSingleton<IFileStorage>(new LocalFileStorage(fileStorageRoot));
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var signingKey = jwtSection["SigningKey"];

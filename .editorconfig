@@ -1,0 +1,25 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{cs,csx,vb,vbx}]
+indent_size = 4
+csharp_new_line_before_open_brace = all
+csharp_prefer_braces = true:suggestion
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+[*.{json,yml,yaml,md,csproj,props,targets,editorconfig}]
+indent_size = 2
+
+[*.cs]
+# Use file-scoped namespaces for new code (CodingRules section 1).
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# IDE0005: remove unused usings (CodingRules section 11).
+dotnet_diagnostic.IDE0005.severity = warning

@@ -5,25 +5,23 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>VHSmart_Api</RootNamespace>
+    <UserSecretsId>VHSmart_Api-8f4f0f4a-6f2b-4d5e-9a1c-3b7d2e6a1c90</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="FluentValidation" Version="12.0.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.0.0" />
     <PackageReference Include="MediatR" Version="12.5.0" />
-	<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
-	<PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
-	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
     <PackageReference Include="Scalar.AspNetCore" Version="2.2.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Shared\Infrastructure\Behavior\" />
-    <Folder Include="Shared\Utilities\" />
   </ItemGroup>
 
 </Project>

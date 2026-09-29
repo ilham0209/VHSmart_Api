@@ -1,9 +1,8 @@
-using IMAS_API_Example.Shared.Models;
-using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
-using System.Reflection;
+using Microsoft.EntityFrameworkCore;
+using VHSmart_Api.Shared.Models;
 
-namespace IMAS_API_Example.Shared.Extensions
+namespace VHSmart_Api.Shared.Extensions
 {
     public static class QueryableExtensions
     {

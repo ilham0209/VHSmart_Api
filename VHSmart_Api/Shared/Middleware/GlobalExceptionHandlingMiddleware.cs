@@ -1,6 +1,6 @@
-﻿using System.Net;
+using System.Net;
 
-namespace IMAS_API_Example.Shared.Middleware
+namespace VHSmart_Api.Shared.Middleware
 {
     public class GlobalExceptionHandlingMiddleware(RequestDelegate next, ILogger<GlobalExceptionHandlingMiddleware> logger)
     {

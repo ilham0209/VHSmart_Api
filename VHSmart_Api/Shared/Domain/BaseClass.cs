@@ -1,38 +1,14 @@
-﻿using System.ComponentModel.DataAnnotations;
+namespace VHSmart_Api.Shared.Domain;
 
-namespace IMAS_API_Example.Shared.Domain
+public abstract class BaseClass
 {
-    public class BaseClass
-    {
-        //[Key]
-        //public Guid ID { get; set; }
-        public bool ISDELETED { get; set; }
-        public string? SYSUSERCREATED { get; set; }
-        public DateTime? SYSDATECREATED { get; set; }
-        public string? SYSUSERMODIFIED { get; set; }
-        public DateTime? SYSDATEMODIFIED { get; set; }
+    public Guid Id { get; set; } = Guid.NewGuid();
 
-        public BaseClass()
-        {
-            //ID = Guid.NewGuid();
-            ISDELETED = false;
-        }
+    public string SysUserCreated { get; set; } = string.Empty;
+    public DateTime SysDateCreated { get; set; }
 
-        public void SetCreated(string user)
-        {
-            SYSUSERCREATED = user;
-            SYSDATECREATED = DateTime.Now;
-        }
+    public string? SysUserModified { get; set; }
+    public DateTime? SysDateModified { get; set; }
 
-        public void SetModified(string user)
-        {
-            SYSUSERMODIFIED = user;
-            SYSDATEMODIFIED = DateTime.Now;
-        }
-
-        public void SetDeleted()
-        {
-            ISDELETED = true;
-        }
-    }
+    public bool IsDeleted { get; set; }
 }

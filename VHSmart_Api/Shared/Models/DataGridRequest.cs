@@ -1,4 +1,4 @@
-namespace IMAS_API_Example.Shared.Models
+namespace VHSmart_Api.Shared.Models
 {
     public class DataGridRequest
     {

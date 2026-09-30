@@ -3,8 +3,10 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using VHSmart_Api.Shared.Infrastructure.Behavior;
+using VHSmart_Api.Shared.Infrastructure.Notifications;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
+using VHSmart_Api.Shared.Infrastructure.Sequences;
 using VHSmart_Api.Shared.Infrastructure.Storage;
 
 namespace VHSmart_Api.Tests;
@@ -59,6 +61,24 @@ public class SmokeTests : IClassFixture<WebApplicationFactory<Program>>
     public void ServiceProvider_WhenBuilt_ResolvesFileStorage()
     {
         Assert.IsType<LocalFileStorage>(_factory.Services.GetRequiredService<IFileStorage>());
+    }
+
+    [Fact]
+    public void ServiceProvider_WhenBuilt_ResolvesReferenceNumberGenerator()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var generator = scope.ServiceProvider.GetRequiredService<IReferenceNumberGenerator>();
+
+        Assert.IsType<ReferenceNumberGenerator>(generator);
+    }
+
+    [Fact]
+    public void ServiceProvider_WhenBuilt_ResolvesNotificationService()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
+
+        Assert.IsType<NotificationService>(notifications);
     }
 
     private sealed record PingRequest(string Message);

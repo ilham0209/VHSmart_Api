@@ -7,8 +7,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using VHSmart_Api.Shared.Infrastructure.Behavior;
+using VHSmart_Api.Shared.Infrastructure.Notifications;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
+using VHSmart_Api.Shared.Infrastructure.Sequences;
 using VHSmart_Api.Shared.Infrastructure.Storage;
 using VHSmart_Api.Shared.Middleware;
 
@@ -26,6 +28,11 @@ builder.Services.AddScoped<ICurrentUser, JwtCurrentUser>();
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
+// Shared services (CodingRules 2): both are scoped because they write through the request's
+// VHSmartDbContext (F-08).
+builder.Services.AddScoped<IReferenceNumberGenerator, ReferenceNumberGenerator>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Relative FileStorage:RootPath is resolved against the content root; the storage root is
 // created lazily on the first upload.

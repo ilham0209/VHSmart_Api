@@ -27,10 +27,17 @@ internal sealed class AuthApiFactory : WebApplicationFactory<Program>
 
     private readonly string _databaseName = $"VHSmartAuthApiTests-{Guid.NewGuid():N}";
 
+    // Uploads must never land in the repository (CodingRules 13): every factory owns a private
+    // storage root that is removed again when the factory is disposed.
+    private readonly string _storageRoot = Path.Combine(
+        Path.GetTempPath(), "VHSmartApiTests", $"storage-{Guid.NewGuid():N}");
+
     public async Task<UserEntity> SeedUserAsync(
         string email = "admin@example.com",
         string password = "Passw0rd!",
-        bool isActive = true)
+        bool isActive = true,
+        Guid? roleId = null,
+        bool isPlatformAdmin = true)
     {
         using var scope = Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<VHSmartDbContext>();
@@ -41,14 +48,28 @@ internal sealed class AuthApiFactory : WebApplicationFactory<Program>
             Name = "API TEST USER",
             Email = email,
             IsActive = isActive,
-            IsPlatformAdmin = true,
-            RoleId = RoleSeedData.VhSmartAdminRoleId,
+            IsPlatformAdmin = isPlatformAdmin,
+            RoleId = roleId ?? RoleSeedData.VhSmartAdminRoleId,
             ActivatedAt = DateTime.UtcNow
         };
         user.PasswordHash = UserPasswordHasher.Hash(user, password);
         db.Users.Add(user);
         await db.SaveChangesAsync();
         return user;
+    }
+
+    // A live role with no AdmRolePermissions rows: default deny (CodingRules 8.2) makes every
+    // HasPermission check fail for it, which is how the 403 path is exercised.
+    public async Task<RoleEntity> SeedRoleWithoutPermissionsAsync(string name = "PERMISSIONLESS ROLE")
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VHSmartDbContext>();
+        await db.Database.EnsureCreatedAsync();
+
+        var role = new RoleEntity { Name = name, IsSystemRole = false };
+        db.Roles.Add(role);
+        await db.SaveChangesAsync();
+        return role;
     }
 
     public async Task AddMembershipAsync(Guid userId, Guid companyId, bool isDefault)
@@ -103,6 +124,7 @@ internal sealed class AuthApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Jwt:SigningKey", TestSigningKey);
+        builder.UseSetting("FileStorage:RootPath", _storageRoot);
 
         builder.ConfigureTestServices(services =>
         {
@@ -113,5 +135,12 @@ internal sealed class AuthApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions>();
             services.AddDbContext<VHSmartDbContext>(options => options.UseInMemoryDatabase(_databaseName));
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing && Directory.Exists(_storageRoot))
+            Directory.Delete(_storageRoot, recursive: true);
     }
 }

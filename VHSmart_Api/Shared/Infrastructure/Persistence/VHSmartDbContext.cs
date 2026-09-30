@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Infrastructure.Security;
@@ -37,6 +38,8 @@ public class VHSmartDbContext(
 
     public DbSet<SchemeEntity> Schemes => Set<SchemeEntity>();
 
+    public DbSet<ServiceProviderEntity> ServiceProviders => Set<ServiceProviderEntity>();
+
     public DbSet<StateEntity> States => Set<StateEntity>();
 
     public DbSet<UserEntity> Users => Set<UserEntity>();
@@ -44,6 +47,8 @@ public class VHSmartDbContext(
     public DbSet<UserCompanyEntity> UserCompanies => Set<UserCompanyEntity>();
 
     public DbSet<UserTokenEntity> UserTokens => Set<UserTokenEntity>();
+
+    public DbSet<WebLinkEntity> WebLinks => Set<WebLinkEntity>();
 
     public override int SaveChanges()
     {
@@ -223,6 +228,36 @@ public class VHSmartDbContext(
             entity.HasData(ReferenceSeedData.SchemeEntities());
         });
 
+        modelBuilder.Entity<ServiceProviderEntity>(entity =>
+        {
+            entity.ToTable("AdmServiceProviders");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.Address).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.Postcode).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.State).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Telephone).IsRequired().HasMaxLength(30);
+            entity.Property(x => x.Fax).HasMaxLength(30);
+            entity.Property(x => x.Webpage).HasMaxLength(200);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(254);
+            entity.Property(x => x.ContactPerson).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.BankName).HasMaxLength(200);
+            entity.Property(x => x.BankAccountNo).HasMaxLength(50);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 3): CompanyId comes from the JWT, indexed because the
+            // global query filter runs on every reference-data list. No unique index - Database.md
+            // 3 defines none for this table, so the duplicate-name rule is a handler check (spec
+            // 21.9) like the CB screen.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CountryEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CountryId);
+        });
+
         modelBuilder.Entity<StateEntity>(entity =>
         {
             entity.ToTable("AdmStates");
@@ -304,12 +339,41 @@ public class VHSmartDbContext(
             entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
             entity.Property(x => x.SysUserModified).HasMaxLength(100);
         });
+
+        modelBuilder.Entity<WebLinkEntity>(entity =>
+        {
+            entity.ToTable("AdmWebLinks");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Webpage).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 3): CompanyId from the JWT, indexed because the global
+            // query filter runs on every reference-data list. No unique index - Database.md 3
+            // defines none for this table, so the duplicate-name rule (spec 21.9) is a handler
+            // check, like Service Provider and CB.
+            entity.HasIndex(x => x.CompanyId);
+            // Icon* is required on the spec 5.4 form, so the owned type is non-null (unlike the
+            // optional Logo / ProfilePicture columns) and every column is NOT NULL.
+            entity.OwnsOne(x => x.Icon, icon =>
+            {
+                icon.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                icon.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                icon.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
     }
 
     private void ApplyAuditAndSoftDelete()
     {
+        // Removing an owner cascade-deletes its owned dependents (the File column group) as
+        // Deleted; run the fixup now so the soft-delete rewrite below sees both sides.
+        ChangeTracker.DetectChanges();
+
         var now = DateTime.UtcNow;
         var user = string.IsNullOrWhiteSpace(_currentUser.UserId) ? SystemUser : _currentUser.UserId;
+        var softDeletedOwners = new List<EntityEntry>();
 
         foreach (var entry in ChangeTracker.Entries<BaseClass>())
         {
@@ -329,7 +393,25 @@ public class VHSmartDbContext(
                     entry.Entity.IsDeleted = true;
                     entry.Entity.SysUserModified = user;
                     entry.Entity.SysDateModified = now;
+                    softDeletedOwners.Add(entry);
                     break;
+            }
+        }
+
+        // The row survives, so its file metadata must survive with it - cascade delete would
+        // drop the columns while the bytes stay in storage, leaving them unreachable. Scoped to
+        // the owners just rewritten: an owned instance that is being REPLACED is also tracked as
+        // Deleted (old and new share one key) and must stay deleted.
+        foreach (var owner in softDeletedOwners)
+        {
+            foreach (var reference in owner.References)
+            {
+                if (reference.CurrentValue is null)
+                    continue;
+
+                var dependent = Entry(reference.CurrentValue);
+                if (dependent.State == EntityState.Deleted)
+                    dependent.State = EntityState.Modified;
             }
         }
     }

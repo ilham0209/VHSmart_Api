@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using VHSmart_Api.Shared.Infrastructure.Persistence;
 namespace VHSmart_Api.Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(VHSmartDbContext))]
-    partial class VHSmartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930025540_CountriesStatesSchemes")]
+    partial class CountriesStatesSchemes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,106 +24,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CertificationBodyEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Acronym")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("Address1")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Address2")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("BankAccountNo")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("BankName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("City")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("ContactPerson")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("CountryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Email")
-                        .HasMaxLength(254)
-                        .HasColumnType("nvarchar(254)");
-
-                    b.Property<string>("Fax")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Notes")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Postcode")
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<Guid?>("RepresentingCountryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("State")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Telephone")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("Webpage")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CountryId");
-
-                    b.HasIndex("RepresentingCountryId");
-
-                    b.ToTable("AdmCertificationBodies", (string)null);
-                });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CountryEntity", b =>
                 {
@@ -2445,63 +2348,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AdmDocumentSequences", (string)null);
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Group")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CompanyId", "Group", "Category", "Name")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("AdmGeneralData", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.NotificationEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3597,100 +3443,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.ServiceProviderEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Address")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("BankAccountNo")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<string>("BankName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ContactPerson")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("CountryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<string>("Email")
-                        .IsRequired()
-                        .HasMaxLength(254)
-                        .HasColumnType("nvarchar(254)");
-
-                    b.Property<string>("Fax")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("Postcode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("State")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Telephone")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<string>("Webpage")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CountryId");
-
-                    b.ToTable("AdmServiceProviders", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.StateEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3876,64 +3628,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.SupportingDocumentEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<int>("DocumentSequence")
-                        .HasColumnType("int");
-
-                    b.Property<string>("DocumentType")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("ForView")
-                        .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsMandatory")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CompanyId", "ForView", "DocumentSequence")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("AdmSupportingDocuments", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.UserCompanyEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4111,101 +3805,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AdmUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.WebLinkEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Webpage")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.ToTable("AdmWebLinks", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CertificationBodyEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.CountryEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CountryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.CountryEntity", null)
-                        .WithMany()
-                        .HasForeignKey("RepresentingCountryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Logo", b1 =>
-                        {
-                            b1.Property<Guid>("CertificationBodyEntityId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.Property<string>("FileName")
-                                .IsRequired()
-                                .HasMaxLength(260)
-                                .HasColumnType("nvarchar(260)");
-
-                            b1.Property<long>("SizeBytes")
-                                .HasColumnType("bigint");
-
-                            b1.Property<string>("StorageKey")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.HasKey("CertificationBodyEntityId");
-
-                            b1.ToTable("AdmCertificationBodies");
-
-                            b1.WithOwner()
-                                .HasForeignKey("CertificationBodyEntityId");
-                        });
-
-                    b.Navigation("Logo");
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.NotificationEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Admin.UserEntity", null)
@@ -4224,15 +3823,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.ServiceProviderEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.CountryEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CountryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.StateEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Admin.CountryEntity", null)
@@ -4240,42 +3830,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasForeignKey("CountryId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.SupportingDocumentEntity", b =>
-                {
-                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Template", b1 =>
-                        {
-                            b1.Property<Guid>("SupportingDocumentEntityId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.Property<string>("FileName")
-                                .IsRequired()
-                                .HasMaxLength(260)
-                                .HasColumnType("nvarchar(260)");
-
-                            b1.Property<long>("SizeBytes")
-                                .HasColumnType("bigint");
-
-                            b1.Property<string>("StorageKey")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.HasKey("SupportingDocumentEntityId");
-
-                            b1.ToTable("AdmSupportingDocuments");
-
-                            b1.WithOwner()
-                                .HasForeignKey("SupportingDocumentEntityId");
-                        });
-
-                    b.Navigation("Template");
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.UserCompanyEntity", b =>
@@ -4335,43 +3889,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.WebLinkEntity", b =>
-                {
-                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Icon", b1 =>
-                        {
-                            b1.Property<Guid>("WebLinkEntityId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.Property<string>("FileName")
-                                .IsRequired()
-                                .HasMaxLength(260)
-                                .HasColumnType("nvarchar(260)");
-
-                            b1.Property<long>("SizeBytes")
-                                .HasColumnType("bigint");
-
-                            b1.Property<string>("StorageKey")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.HasKey("WebLinkEntityId");
-
-                            b1.ToTable("AdmWebLinks");
-
-                            b1.WithOwner()
-                                .HasForeignKey("WebLinkEntityId");
-                        });
-
-                    b.Navigation("Icon")
                         .IsRequired();
                 });
 #pragma warning restore 612, 618

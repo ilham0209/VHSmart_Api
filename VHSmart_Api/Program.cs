@@ -1,11 +1,17 @@
 using System.Text;
 using FluentValidation;
+using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
+using VHSmart_Api.Shared.Infrastructure.Behavior;
+using VHSmart_Api.Shared.Infrastructure.Notifications;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
+using VHSmart_Api.Shared.Infrastructure.Sequences;
+using VHSmart_Api.Shared.Infrastructure.Storage;
 using VHSmart_Api.Shared.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,11 +22,26 @@ builder.Services.AddOpenApi();
 builder.Services.AddDbContext<VHSmartDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("VHSmart")));
 
-// Task F-03 replaces this with the implementation read from the JWT claims.
-builder.Services.AddScoped<ICurrentUser, SystemCurrentUser>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ICurrentUser, JwtCurrentUser>();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+
+// Shared services (CodingRules 2): both are scoped because they write through the request's
+// VHSmartDbContext (F-08).
+builder.Services.AddScoped<IReferenceNumberGenerator, ReferenceNumberGenerator>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// Relative FileStorage:RootPath is resolved against the content root; the storage root is
+// created lazily on the first upload.
+var fileStorageRoot = builder.Configuration["FileStorage:RootPath"];
+if (string.IsNullOrWhiteSpace(fileStorageRoot))
+    fileStorageRoot = "App_Data/Files";
+if (!Path.IsPathRooted(fileStorageRoot))
+    fileStorageRoot = Path.Combine(builder.Environment.ContentRootPath, fileStorageRoot);
+builder.Services.AddSingleton<IFileStorage>(new LocalFileStorage(fileStorageRoot));
 
 var jwtSection = builder.Configuration.GetSection("Jwt");
 var signingKey = jwtSection["SigningKey"];
@@ -44,7 +65,18 @@ builder.Services
                 : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey))
         };
     });
-builder.Services.AddAuthorization();
+// AddAuthorization only TryAdds the default policy provider, so ours goes in first.
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+// Default deny until A-01 creates AdmRolePermissions (D-19).
+builder.Services.AddScoped<IPermissionService, DenyAllPermissionService>();
+builder.Services.AddAuthorization(options =>
+{
+    // Endpoints with no explicit policy still need a signed-in user (CodingRules 8.2).
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
@@ -90,7 +122,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapHealthChecks("/health");
+// Probes are not data endpoints: without AllowAnonymous the fallback policy answers 401.
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();
 

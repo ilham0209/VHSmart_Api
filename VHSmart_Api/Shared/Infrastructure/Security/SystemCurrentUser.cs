@@ -7,6 +7,8 @@ public sealed class SystemCurrentUser : ICurrentUser
 
     public Guid CompanyId => Guid.Empty;
 
+    public Guid RoleId => Guid.Empty;
+
     public bool IsPlatformAdmin => false;
 
     public bool ViewAllCompanies => false;

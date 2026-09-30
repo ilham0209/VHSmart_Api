@@ -12,6 +12,9 @@ Decisions.md
 Readme.md
 TaskList.md
 
+# Uploaded files (local file storage, never committed)
+App_Data/
+
 # User-specific files
 *.rsuser
 *.suo

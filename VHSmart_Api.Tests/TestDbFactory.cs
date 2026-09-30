@@ -18,17 +18,23 @@ public class TestTenantRecord : BaseClass, ITenantEntity
 public class TestGlobalRecord : BaseClass
 {
     public string Name { get; set; } = string.Empty;
+
+    // Nullable column, so search/sort code is exercised against null values too.
+    public string? Note { get; set; }
 }
 
 public sealed class TestCurrentUser(
     string userId,
     Guid companyId,
+    Guid roleId = default,
     bool isPlatformAdmin = false,
     bool viewAllCompanies = false) : ICurrentUser
 {
     public string UserId { get; } = userId;
 
     public Guid CompanyId { get; } = companyId;
+
+    public Guid RoleId { get; } = roleId;
 
     public bool IsPlatformAdmin { get; } = isPlatformAdmin;
 

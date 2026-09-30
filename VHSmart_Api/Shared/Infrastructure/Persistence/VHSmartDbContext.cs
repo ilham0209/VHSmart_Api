@@ -40,6 +40,8 @@ public class VHSmartDbContext(
 
     public DbSet<ServiceProviderEntity> ServiceProviders => Set<ServiceProviderEntity>();
 
+    public DbSet<SupportingDocumentEntity> SupportingDocuments => Set<SupportingDocumentEntity>();
+
     public DbSet<StateEntity> States => Set<StateEntity>();
 
     public DbSet<UserEntity> Users => Set<UserEntity>();
@@ -361,6 +363,37 @@ public class VHSmartDbContext(
                 icon.Property(f => f.FileName).IsRequired().HasMaxLength(260);
                 icon.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
                 icon.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<SupportingDocumentEntity>(entity =>
+        {
+            entity.ToTable("AdmSupportingDocuments");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its Database.md string (CodingRules 11), e.g. "SopHas".
+            entity.Property(x => x.ForView).IsRequired().HasMaxLength(30).HasConversion<string>();
+            entity.Property(x => x.DocumentType).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.DocumentSequence).IsRequired();
+            entity.Property(x => x.IsMandatory).IsRequired();
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // No FK: AdmCompanies arrives with C-01. Indexed because the tenant filter runs on
+            // every reference-data list.
+            entity.HasIndex(x => x.CompanyId);
+            // UQ (CompanyId, ForView, DocumentSequence) among live rows (Database.md 3): a soft
+            // delete frees the sequence. The handler returns the manual's message instead of
+            // letting this fire (D-16).
+            entity.HasIndex(x => new { x.CompanyId, x.ForView, x.DocumentSequence })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            // Template File? (Database.md 3): optional owned type - only the SOP views of
+            // spec 5.5 carry one, the other rows keep NULL columns.
+            entity.OwnsOne(x => x.Template, template =>
+            {
+                template.Property(f => f.FileName).HasMaxLength(260);
+                template.Property(f => f.StorageKey).HasMaxLength(100);
+                template.Property(f => f.ContentType).HasMaxLength(100);
             });
         });
     }

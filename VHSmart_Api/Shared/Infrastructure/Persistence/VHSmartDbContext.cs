@@ -25,6 +25,8 @@ public class VHSmartDbContext(
 
     public DbSet<DocumentSequenceEntity> DocumentSequences => Set<DocumentSequenceEntity>();
 
+    public DbSet<GeneralDataEntity> GeneralData => Set<GeneralDataEntity>();
+
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
@@ -82,6 +84,28 @@ public class VHSmartDbContext(
             entity.HasIndex(x => x.Scope).IsUnique();
             entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
             entity.Property(x => x.SysUserModified).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<GeneralDataEntity>(entity =>
+        {
+            entity.ToTable("AdmGeneralData");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its spec string (CodingRules 11), e.g. "COMPANY".
+            entity.Property(x => x.Group).IsRequired().HasMaxLength(30).HasConversion<string>();
+            entity.Property(x => x.Category).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // No FK: ComCompanies arrives with C-01. Indexed because the tenant filter runs on
+            // every reference-data list.
+            entity.HasIndex(x => x.CompanyId);
+            // UQ (CompanyId, Group, Category, Name) among live rows (Database.md 3): a soft
+            // delete frees the name. The handler returns the friendly message instead of
+            // letting this fire.
+            entity.HasIndex(x => new { x.CompanyId, x.Group, x.Category, x.Name })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

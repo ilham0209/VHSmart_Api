@@ -2,6 +2,7 @@ using System.Text;
 using FluentValidation;
 using MediatR;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -57,7 +58,18 @@ builder.Services
                 : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey))
         };
     });
-builder.Services.AddAuthorization();
+// AddAuthorization only TryAdds the default policy provider, so ours goes in first.
+builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+// Default deny until A-01 creates AdmRolePermissions (D-19).
+builder.Services.AddScoped<IPermissionService, DenyAllPermissionService>();
+builder.Services.AddAuthorization(options =>
+{
+    // Endpoints with no explicit policy still need a signed-in user (CodingRules 8.2).
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(options =>
@@ -103,7 +115,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-app.MapHealthChecks("/health");
+// Probes are not data endpoints: without AllowAnonymous the fallback policy answers 401.
+app.MapHealthChecks("/health").AllowAnonymous();
 
 app.Run();
 

@@ -17,4 +17,9 @@ internal sealed class StubPermissionService : IPermissionService
         PermissionAction action,
         CancellationToken cancellationToken = default) =>
         Task.FromResult(_granted.Contains((roleId, key, action)));
+
+    public void Invalidate(Guid roleId)
+    {
+        // Nothing is cached, so a granted permission is visible immediately.
+    }
 }

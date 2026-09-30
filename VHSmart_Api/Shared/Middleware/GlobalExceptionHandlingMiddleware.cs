@@ -71,6 +71,9 @@ public class GlobalExceptionHandlingMiddleware(
                     Instance = instance
                 });
 
+            case UnauthorizedException unauthorized:
+                return Problem(StatusCodes.Status401Unauthorized, "Unauthorized", unauthorized.Message, instance);
+
             case NotFoundException notFound:
                 return Problem(StatusCodes.Status404NotFound, "Not Found", notFound.Message, instance);
 

@@ -41,6 +41,16 @@ public class GlobalExceptionHandlingMiddlewareTests
     }
 
     [Fact]
+    public async Task InvokeAsync_Unauthorized_Returns401WithMessage()
+    {
+        var context = await RunAsync(() => throw new UnauthorizedException("Invalid email or password."));
+
+        Assert.Equal(StatusCodes.Status401Unauthorized, context.Response.StatusCode);
+        using var problem = await ReadProblemAsync(context);
+        Assert.Equal("Invalid email or password.", problem.RootElement.GetProperty("detail").GetString());
+    }
+
+    [Fact]
     public async Task InvokeAsync_NotFound_Returns404WithMessage()
     {
         var context = await RunAsync(() => throw new NotFoundException("Record not found."));

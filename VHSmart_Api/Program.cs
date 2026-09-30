@@ -10,6 +10,7 @@ using VHSmart_Api.Shared.Infrastructure.Behavior;
 using VHSmart_Api.Shared.Infrastructure.Notifications;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
+using VHSmart_Api.Shared.Infrastructure.Seeding;
 using VHSmart_Api.Shared.Infrastructure.Sequences;
 using VHSmart_Api.Shared.Infrastructure.Storage;
 using VHSmart_Api.Shared.Middleware;
@@ -24,6 +25,10 @@ builder.Services.AddDbContext<VHSmartDbContext>(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, JwtCurrentUser>();
+
+// Issues the D-29 claims at login / Switch Company; scoped like the rest of the request
+// services (it reads configuration only, never a DbContext).
+builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssemblyContaining<Program>());
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
@@ -68,8 +73,10 @@ builder.Services
 // AddAuthorization only TryAdds the default policy provider, so ours goes in first.
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
-// Default deny until A-01 creates AdmRolePermissions (D-19).
-builder.Services.AddScoped<IPermissionService, DenyAllPermissionService>();
+// Reads AdmRolePermissions (A-01, D-19); the matrix is cached per role and invalidated when a
+// role is edited.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IPermissionService, RolePermissionService>();
 builder.Services.AddAuthorization(options =>
 {
     // Endpoints with no explicit policy still need a signed-in user (CodingRules 8.2).
@@ -98,6 +105,19 @@ if (string.IsNullOrWhiteSpace(signingKey))
 {
     app.Logger.LogWarning(
         "Jwt:SigningKey is not configured, so issued tokens will be rejected. Set it with: dotnet user-secrets set \"Jwt:SigningKey\" <key>");
+}
+
+// Database.md 14: first platform admin via an explicit command (password from the secret
+// store). Runs before the pipeline and never serves a request.
+if (args is [PlatformAdminSeeder.Command, ..])
+{
+    var seedResult = await PlatformAdminSeeder.RunAsync(app.Services);
+    if (seedResult.Success)
+        app.Logger.LogInformation("{Message}", seedResult.Message);
+    else
+        app.Logger.LogError("{Message}", seedResult.Message);
+    Environment.ExitCode = seedResult.Success ? 0 : 1;
+    return;
 }
 
 if (app.Environment.IsDevelopment())

@@ -10,4 +10,9 @@ public interface IPermissionService
         string key,
         PermissionAction action,
         CancellationToken cancellationToken = default);
+
+    // The matrix is cached per role (CodingRules 8.2), so saving a role's permissions has to
+    // drop that entry - the next check then re-reads AdmRolePermissions. No-op for implementations
+    // that do not cache.
+    void Invalidate(Guid roleId);
 }

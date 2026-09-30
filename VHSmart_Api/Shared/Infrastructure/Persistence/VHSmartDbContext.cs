@@ -21,6 +21,8 @@ public class VHSmartDbContext(
     public bool CurrentIsPlatformAdminViewAll { get; } =
         currentUser.IsPlatformAdmin || currentUser.ViewAllCompanies;
 
+    public DbSet<CountryEntity> Countries => Set<CountryEntity>();
+
     public DbSet<DocumentSequenceEntity> DocumentSequences => Set<DocumentSequenceEntity>();
 
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
@@ -28,6 +30,10 @@ public class VHSmartDbContext(
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
 
     public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
+
+    public DbSet<SchemeEntity> Schemes => Set<SchemeEntity>();
+
+    public DbSet<StateEntity> States => Set<StateEntity>();
 
     public DbSet<UserEntity> Users => Set<UserEntity>();
 
@@ -56,6 +62,17 @@ public class VHSmartDbContext(
 
     private static void ApplyTableConfiguration(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<CountryEntity>(entity =>
+        {
+            entity.ToTable("AdmCountries");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.IsoCode).IsRequired().HasMaxLength(3);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasData(ReferenceSeedData.CountryEntities());
+        });
+
         modelBuilder.Entity<DocumentSequenceEntity>(entity =>
         {
             entity.ToTable("AdmDocumentSequences");
@@ -124,6 +141,34 @@ public class VHSmartDbContext(
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
             entity.HasData(RoleSeedData.PermissionEntities());
+        });
+
+        modelBuilder.Entity<SchemeEntity>(entity =>
+        {
+            entity.ToTable("AdmSchemes");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).HasMaxLength(10);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.IsFoodPremise).IsRequired();
+            entity.Property(x => x.SortOrder).IsRequired();
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasData(ReferenceSeedData.SchemeEntities());
+        });
+
+        modelBuilder.Entity<StateEntity>(entity =>
+        {
+            entity.ToTable("AdmStates");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasOne<CountryEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CountryId);
+            entity.HasData(ReferenceSeedData.StateEntities());
         });
 
         modelBuilder.Entity<UserEntity>(entity =>

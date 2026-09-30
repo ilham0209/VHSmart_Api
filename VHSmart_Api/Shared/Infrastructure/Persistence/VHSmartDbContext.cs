@@ -25,6 +25,10 @@ public class VHSmartDbContext(
 
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
+    public DbSet<RoleEntity> Roles => Set<RoleEntity>();
+
+    public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
+
     public override int SaveChanges()
     {
         ApplyAuditAndSoftDelete();
@@ -61,7 +65,7 @@ public class VHSmartDbContext(
         {
             entity.ToTable("AdmNotifications");
             entity.HasKey(x => x.Id);
-            // No FK yet: AdmUsers arrives with A-01/A-02, and EF cannot reference a table the
+            // No FK yet: AdmUsers arrives with A-02, and EF cannot reference a table the
             // model does not have. The index keeps the bell lookup ("my unread rows") fast.
             entity.Property(x => x.UserId).IsRequired();
             entity.HasIndex(x => x.UserId);
@@ -72,6 +76,44 @@ public class VHSmartDbContext(
             entity.Property(x => x.LinkUrl).HasMaxLength(300);
             entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
             entity.Property(x => x.SysUserModified).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<RoleEntity>(entity =>
+        {
+            entity.ToTable("AdmRoles");
+            entity.HasKey(x => x.Id);
+            // No FK: ComCompanies arrives with C-01. Null CompanyId = system role, and the
+            // tenant filter never applies to this table (Database.md 5), so the column is
+            // deliberately not part of an ITenantEntity.
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.Property(x => x.IsSystemRole).IsRequired();
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasData(RoleSeedData.RoleEntities());
+        });
+
+        modelBuilder.Entity<RolePermissionEntity>(entity =>
+        {
+            entity.ToTable("AdmRolePermissions");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PermissionKey).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.CanView).IsRequired();
+            entity.Property(x => x.CanCreate).IsRequired();
+            entity.Property(x => x.CanEdit).IsRequired();
+            entity.Property(x => x.CanDelete).IsRequired();
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasOne<RoleEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (RoleId, PermissionKey) among live rows only: revoking a screen is a soft
+            // delete, so the same screen can be granted again without colliding (CodingRules 7.2).
+            entity.HasIndex(x => new { x.RoleId, x.PermissionKey })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasData(RoleSeedData.PermissionEntities());
         });
     }
 

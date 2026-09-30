@@ -68,8 +68,10 @@ builder.Services
 // AddAuthorization only TryAdds the default policy provider, so ours goes in first.
 builder.Services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
 builder.Services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
-// Default deny until A-01 creates AdmRolePermissions (D-19).
-builder.Services.AddScoped<IPermissionService, DenyAllPermissionService>();
+// Reads AdmRolePermissions (A-01, D-19); the matrix is cached per role and invalidated when a
+// role is edited.
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IPermissionService, RolePermissionService>();
 builder.Services.AddAuthorization(options =>
 {
     // Endpoints with no explicit policy still need a signed-in user (CodingRules 8.2).

@@ -87,4 +87,51 @@ public static class PermissionKeys
     public const string SupportSubmit = "Support.Submit";
 
     public const string AccountSetting = "Account.Setting";
+
+    // Every screen key in one list: the seeded role matrix (RoleSeedData), the validation of an
+    // assigned matrix and the permission-matrix response all need the complete set.
+    public static readonly IReadOnlyList<string> All =
+    [
+        Dashboard,
+        AdminGeneralData,
+        AdminCertificationBodies,
+        AdminServiceProviders,
+        AdminWebLinks,
+        AdminSupportingDocuments,
+        AdminCompanies,
+        AdminUsers,
+        AdvancedSearch,
+        CompanyGeneral,
+        CompanyHalalPolicy,
+        CompanyProfiles,
+        CompanyInternalHalalCommittee,
+        PersonnelAllStaff,
+        PersonnelInternalTraining,
+        PremiseManagePremise,
+        ProductManageProduct,
+        ProductManageMenu,
+        ProductManageMenuConcept,
+        ProductVerifyHalalProductUpdate,
+        RawMaterialManufacturerSupplier,
+        RawMaterialMasterList,
+        HalalApplicationManageBatch,
+        HalalApplicationMyApplication,
+        HalalApplicationCertificateItem,
+        HalalApplicationHalalCertificate,
+        AuditAuditPrefix,
+        AuditRecommendation,
+        AuditFinding,
+        AuditAuditCriteria,
+        AuditAuditChecklist,
+        AuditGroupAuditor,
+        AuditAuditPlanning,
+        AuditAuditTask,
+        AuditExternalReport,
+        AuditNonConformance,
+        PaymentCertificate,
+        PaymentOther,
+        ReferenceView,
+        SupportSubmit,
+        AccountSetting
+    ];
 }

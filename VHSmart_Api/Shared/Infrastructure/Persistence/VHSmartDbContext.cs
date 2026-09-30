@@ -29,6 +29,12 @@ public class VHSmartDbContext(
 
     public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
 
+    public DbSet<UserEntity> Users => Set<UserEntity>();
+
+    public DbSet<UserCompanyEntity> UserCompanies => Set<UserCompanyEntity>();
+
+    public DbSet<UserTokenEntity> UserTokens => Set<UserTokenEntity>();
+
     public override int SaveChanges()
     {
         ApplyAuditAndSoftDelete();
@@ -65,10 +71,14 @@ public class VHSmartDbContext(
         {
             entity.ToTable("AdmNotifications");
             entity.HasKey(x => x.Id);
-            // No FK yet: AdmUsers arrives with A-02, and EF cannot reference a table the
-            // model does not have. The index keeps the bell lookup ("my unread rows") fast.
+            // A-02 added AdmUsers, so the FK deferred in F-08 is wired now. The index keeps
+            // the bell lookup ("my unread rows") fast.
             entity.Property(x => x.UserId).IsRequired();
             entity.HasIndex(x => x.UserId);
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.CompanyId);
             entity.Property(x => x.Subject).IsRequired().HasMaxLength(200);
             entity.Property(x => x.Message).IsRequired().HasMaxLength(1000);
@@ -114,6 +124,73 @@ public class VHSmartDbContext(
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
             entity.HasData(RoleSeedData.PermissionEntities());
+        });
+
+        modelBuilder.Entity<UserEntity>(entity =>
+        {
+            entity.ToTable("AdmUsers");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(254);
+            entity.Property(x => x.PasswordHash).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.MustChangePassword).IsRequired();
+            entity.Property(x => x.IsActive).IsRequired();
+            entity.Property(x => x.IsPlatformAdmin).IsRequired();
+            entity.Property(x => x.ContactNo).HasMaxLength(30);
+            entity.Property(x => x.FailedLoginCount).IsRequired();
+            // File column group (Database.md 1) as an owned type; the row has no bytes.
+            entity.OwnsOne(x => x.ProfilePicture, picture =>
+            {
+                picture.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                picture.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                picture.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+            entity.HasOne<RoleEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ Email among live rows only (spec 21.9): a soft-deleted user frees the address.
+            entity.HasIndex(x => x.Email)
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<UserCompanyEntity>(entity =>
+        {
+            entity.ToTable("AdmUserCompanies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.IsDefault).IsRequired();
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // No FK: ComCompanies arrives with C-01. Indexed because login resolves the
+            // company list of one user on every sign-in.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => new { x.UserId, x.CompanyId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+        });
+
+        modelBuilder.Entity<UserTokenEntity>(entity =>
+        {
+            entity.ToTable("AdmUserTokens");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Purpose).IsRequired().HasConversion<string>().HasMaxLength(50);
+            entity.Property(x => x.TokenHash).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.ExpiresAt).IsRequired();
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Activation / reset look the token up by its hash alone.
+            entity.HasIndex(x => x.TokenHash);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
         });
     }
 

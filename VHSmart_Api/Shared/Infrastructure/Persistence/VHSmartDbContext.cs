@@ -21,6 +21,8 @@ public class VHSmartDbContext(
     public bool CurrentIsPlatformAdminViewAll { get; } =
         currentUser.IsPlatformAdmin || currentUser.ViewAllCompanies;
 
+    public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
+
     public DbSet<CountryEntity> Countries => Set<CountryEntity>();
 
     public DbSet<DocumentSequenceEntity> DocumentSequences => Set<DocumentSequenceEntity>();
@@ -64,6 +66,47 @@ public class VHSmartDbContext(
 
     private static void ApplyTableConfiguration(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<CertificationBodyEntity>(entity =>
+        {
+            entity.ToTable("AdmCertificationBodies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Acronym).HasMaxLength(50);
+            entity.Property(x => x.Notes).HasMaxLength(1000);
+            entity.Property(x => x.Address1).HasMaxLength(200);
+            entity.Property(x => x.Address2).HasMaxLength(200);
+            entity.Property(x => x.City).HasMaxLength(100);
+            entity.Property(x => x.Postcode).HasMaxLength(20);
+            entity.Property(x => x.State).HasMaxLength(100);
+            entity.Property(x => x.Telephone).HasMaxLength(30);
+            entity.Property(x => x.Fax).HasMaxLength(30);
+            entity.Property(x => x.Webpage).HasMaxLength(200);
+            entity.Property(x => x.Email).HasMaxLength(254);
+            entity.Property(x => x.ContactPerson).HasMaxLength(200);
+            entity.Property(x => x.BankName).HasMaxLength(200);
+            entity.Property(x => x.BankAccountNo).HasMaxLength(50);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // No navigation properties: the dropdown sources come from their own endpoints
+            // (GET api/admin/countries), the list joins for the display name only.
+            entity.HasOne<CountryEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CountryEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RepresentingCountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // File column group (Database.md 3): the row keeps metadata, the bytes live in
+            // IFileStorage (F-06).
+            entity.OwnsOne(x => x.Logo, logo =>
+            {
+                logo.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                logo.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                logo.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
         modelBuilder.Entity<CountryEntity>(entity =>
         {
             entity.ToTable("AdmCountries");

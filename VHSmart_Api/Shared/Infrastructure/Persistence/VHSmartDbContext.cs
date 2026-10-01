@@ -37,6 +37,8 @@ public class VHSmartDbContext(
 
     public DbSet<GeneralDataEntity> GeneralData => Set<GeneralDataEntity>();
 
+    public DbSet<HalalPolicyEntity> HalalPolicies => Set<HalalPolicyEntity>();
+
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
@@ -198,6 +200,38 @@ public class VHSmartDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.BrandId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<HalalPolicyEntity>(entity =>
+        {
+            entity.ToTable("ComHalalPolicies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PolicyDate).HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // One policy per scheme per company among live rows (Database.md 3, spec 7.2
+            // [VERIFY] default "enforce"): deleting the row frees the pair for a re-upload.
+            entity.HasIndex(x => new { x.CompanyId, x.SchemeId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Scheme)
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            // Document* is required (Database.md 3): the NOT NULL File column group; the bytes
+            // stay in IFileStorage, the row only carries the metadata.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
         });
 
         modelBuilder.Entity<CountryEntity>(entity =>

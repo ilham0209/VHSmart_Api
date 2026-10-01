@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using VHSmart_Api.Shared.Infrastructure.Persistence;
 namespace VHSmart_Api.Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(VHSmartDbContext))]
-    partial class VHSmartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260930073644_ComCompanies")]
+    partial class ComCompanies
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -120,66 +123,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.HasIndex("RepresentingCountryId");
 
                     b.ToTable("AdmCertificationBodies", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CompanySubscriptionEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<int>("DurationMonths")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("EndDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("EntryType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime?>("ExpiryWarningSentAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Label")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("PackageId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("StartDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("PackageId");
-
-                    b.ToTable("AdmCompanySubscriptions", (string)null);
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CountryEntity", b =>
@@ -3938,111 +3881,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.SubscriptionPackageEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Code")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<int?>("MaxPremises")
-                        .HasColumnType("int");
-
-                    b.Property<int?>("MaxUsers")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AdmSubscriptionPackages", (string)null);
-
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("ee5b32c4-cd73-1f79-55bd-31fc664430e7"),
-                            Code = "PLA",
-                            IsDeleted = false,
-                            Name = "Premium",
-                            SysDateCreated = new DateTime(2026, 9, 30, 0, 0, 0, 0, DateTimeKind.Utc),
-                            SysUserCreated = "system"
-                        },
-                        new
-                        {
-                            Id = new Guid("89bcf2d9-cb0e-6355-c25b-d65c7271d408"),
-                            Code = "TRL",
-                            IsDeleted = false,
-                            Name = "Trial",
-                            SysDateCreated = new DateTime(2026, 9, 30, 0, 0, 0, 0, DateTimeKind.Utc),
-                            SysUserCreated = "system"
-                        },
-                        new
-                        {
-                            Id = new Guid("7ef8c53d-ec5f-73bb-33f0-97f127a99c3f"),
-                            Code = "ADC",
-                            IsDeleted = false,
-                            MaxPremises = 5,
-                            MaxUsers = 10,
-                            Name = "Advanced",
-                            SysDateCreated = new DateTime(2026, 9, 30, 0, 0, 0, 0, DateTimeKind.Utc),
-                            SysUserCreated = "system"
-                        },
-                        new
-                        {
-                            Id = new Guid("d450231d-5b75-b973-a3ab-0c1744ba964d"),
-                            Code = "EASY-HOME",
-                            IsDeleted = false,
-                            Name = "Easy Home",
-                            SysDateCreated = new DateTime(2026, 9, 30, 0, 0, 0, 0, DateTimeKind.Utc),
-                            SysUserCreated = "system"
-                        },
-                        new
-                        {
-                            Id = new Guid("707493bc-cb53-f48f-42f3-1704448ec9d6"),
-                            Code = "BSC-MICRO",
-                            IsDeleted = false,
-                            Name = "Basic Micro",
-                            SysDateCreated = new DateTime(2026, 9, 30, 0, 0, 0, 0, DateTimeKind.Utc),
-                            SysUserCreated = "system"
-                        },
-                        new
-                        {
-                            Id = new Guid("968a7d73-0ca4-488a-8d08-8be235a51123"),
-                            Code = "LTE",
-                            IsDeleted = false,
-                            MaxPremises = 1,
-                            MaxUsers = 1,
-                            Name = "Lite",
-                            SysDateCreated = new DateTime(2026, 9, 30, 0, 0, 0, 0, DateTimeKind.Utc),
-                            SysUserCreated = "system"
-                        });
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.SupportingDocumentEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4553,21 +4391,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         });
 
                     b.Navigation("Logo");
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CompanySubscriptionEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.SubscriptionPackageEntity", null)
-                        .WithMany()
-                        .HasForeignKey("PackageId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", b =>

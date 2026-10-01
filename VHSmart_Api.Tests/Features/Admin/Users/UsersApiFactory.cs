@@ -13,28 +13,32 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
+using VHSmart_Api.Tests.Shared.Infrastructure.Security;
 
-namespace VHSmart_Api.Tests.Shared.Infrastructure.Security;
+namespace VHSmart_Api.Tests.Features.Admin.Users;
 
-// Boots the real pipeline - JWT bearer -> JwtCurrentUser -> SubscriptionExpiryMiddleware ->
-// fallback policy -> [HasPermission] - around the fixture controllers above, with
-// IPermissionService swapped for a stub. The signing key is generated per factory, so no
-// secret is ever written to source (D-29). The DbContext is swapped for an in-memory store
-// because the expiry middleware queries subscriptions on every authenticated request.
-public sealed class PermissionApiFactory : WebApplicationFactory<Program>
+// Real pipeline (JWT -> JwtCurrentUser -> [HasPermission] -> MediatR -> UserController) with
+// SQL Server swapped for a private in-memory store and IPermissionService stubbed, so the
+// permission gate and the data scope (platform admin vs company admin) can be varied
+// independently. Signing key is generated per factory (D-29: no secret in source).
+internal sealed class UsersApiFactory : WebApplicationFactory<Program>
 {
     private static readonly string TestSigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
-    private readonly HashSet<(Guid RoleId, string Key, PermissionAction Action)> _granted;
+    private readonly Guid _grantedRoleId;
+    private readonly bool _grantPermissions;
+    private readonly string _databaseName = $"VHSmartUserApiTests-{Guid.NewGuid():N}";
 
-    private readonly string _databaseName = $"VHSmartPermissionApiTests-{Guid.NewGuid():N}";
+    public UsersApiFactory(Guid grantedRoleId, bool grantPermissions = true)
+    {
+        _grantedRoleId = grantedRoleId;
+        _grantPermissions = grantPermissions;
+    }
 
-    public PermissionApiFactory(params (Guid RoleId, string Key, PermissionAction Action)[] granted) =>
-        _granted = [.. granted];
-
-    // Mints a token the app will actually accept: issuer, audience and key are read back from
-    // the resolved JwtBearerOptions rather than assumed, so the test proves the config plumbing.
-    public string CreateToken(Guid roleId)
+    public string CreateToken(
+        Guid userId,
+        Guid companyId,
+        bool isPlatformAdmin = true)
     {
         var parameters = Services
             .GetRequiredService<IOptionsMonitor<JwtBearerOptions>>()
@@ -49,16 +53,25 @@ public sealed class PermissionApiFactory : WebApplicationFactory<Program>
             audience: parameters.ValidAudience,
             claims:
             [
-                new Claim(JwtClaims.UserId, Guid.NewGuid().ToString()),
-                new Claim(JwtClaims.CompanyId, Guid.NewGuid().ToString()),
-                new Claim(JwtClaims.RoleId, roleId.ToString()),
-                new Claim(JwtClaims.IsPlatformAdmin, bool.FalseString),
+                new Claim(JwtClaims.UserId, userId.ToString()),
+                new Claim(JwtClaims.CompanyId, companyId.ToString()),
+                new Claim(JwtClaims.RoleId, _grantedRoleId.ToString()),
+                new Claim(
+                    JwtClaims.IsPlatformAdmin,
+                    isPlatformAdmin ? bool.TrueString : bool.FalseString),
                 new Claim(JwtClaims.ViewAllCompanies, bool.FalseString)
             ],
             expires: DateTime.UtcNow.AddMinutes(5),
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256));
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public async Task SeedDatabaseAsync()
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VHSmartDbContext>();
+        await db.Database.EnsureCreatedAsync();
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -74,8 +87,18 @@ public sealed class PermissionApiFactory : WebApplicationFactory<Program>
             services.RemoveAll<DbContextOptions>();
             services.AddDbContext<VHSmartDbContext>(options => options.UseInMemoryDatabase(_databaseName));
 
-            services.AddSingleton<IPermissionService>(new StubPermissionService(_granted));
-            services.AddControllers().AddApplicationPart(typeof(PermissionTestController).Assembly);
+            var actions = _grantPermissions
+                ? new[]
+                {
+                    PermissionAction.View,
+                    PermissionAction.Create,
+                    PermissionAction.Edit,
+                    PermissionAction.Delete
+                }
+                : Array.Empty<PermissionAction>();
+
+            var granted = actions.Select(action => (_grantedRoleId, PermissionKeys.AdminUsers, action));
+            services.AddSingleton<IPermissionService>(new StubPermissionService(granted));
         });
     }
 }

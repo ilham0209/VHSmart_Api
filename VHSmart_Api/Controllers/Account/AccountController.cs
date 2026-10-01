@@ -4,12 +4,13 @@ using Microsoft.AspNetCore.Mvc;
 using VHSmart_Api.Features.Account.Password;
 using VHSmart_Api.Features.Account.Profile;
 using VHSmart_Api.Features.Account.ProfilePicture;
+using VHSmart_Api.Features.Account.Subscription;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
 namespace VHSmart_Api.Controllers.Account;
 
 // Account Setting (spec 6.4): a self-service screen every user opens from the top bar, so all
-// four actions carry the Account.Setting key with View. The seeded roles hold View only
+// actions carry the Account.Setting key with View. The seeded roles hold View only
 // (A-01); gating change password behind Edit would lock ordinary users out of their own
 // password. The FallbackPolicy challenges anonymous callers with 401 before this runs.
 [ApiController]
@@ -42,4 +43,19 @@ public class AccountController(ISender sender) : ControllerBase
         var response = await sender.Send(new GetProfilePictureQuery(), ct);
         return new FileStreamResult(response.Content, response.ContentType);
     }
+
+    // Subscription tab (spec 6.4): header fields plus the SUBSCRIPTION HISTORY table. These
+    // two stay reachable when the subscription has expired (D-11) - the middleware exempts
+    // this path so the owner can see the expiry date and renew.
+    [HttpGet("subscription")]
+    [HasPermission(PermissionKeys.AccountSetting, PermissionAction.View)]
+    public async Task<IActionResult> GetSubscription(CancellationToken ct)
+        => Ok(await sender.Send(new GetSubscriptionQuery(), ct));
+
+    [HttpGet("subscription/history")]
+    [HasPermission(PermissionKeys.AccountSetting, PermissionAction.View)]
+    public async Task<IActionResult> GetSubscriptionHistory(
+        [FromQuery] GetSubscriptionHistoryQuery query,
+        CancellationToken ct)
+        => Ok(await sender.Send(query, ct));
 }

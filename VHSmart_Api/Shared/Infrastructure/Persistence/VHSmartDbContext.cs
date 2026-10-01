@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
+using VHSmart_Api.Shared.Domain.Companies;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
 namespace VHSmart_Api.Shared.Infrastructure.Persistence;
@@ -24,6 +25,12 @@ public class VHSmartDbContext(
 
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
+    public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
+
+    public DbSet<CompanySubscriptionEntity> CompanySubscriptions => Set<CompanySubscriptionEntity>();
+
+    public DbSet<CompanyEntity> Companies => Set<CompanyEntity>();
+
     public DbSet<CountryEntity> Countries => Set<CountryEntity>();
 
     public DbSet<DocumentSequenceEntity> DocumentSequences => Set<DocumentSequenceEntity>();
@@ -43,6 +50,8 @@ public class VHSmartDbContext(
     public DbSet<SupportingDocumentEntity> SupportingDocuments => Set<SupportingDocumentEntity>();
 
     public DbSet<StateEntity> States => Set<StateEntity>();
+
+    public DbSet<SubscriptionPackageEntity> SubscriptionPackages => Set<SubscriptionPackageEntity>();
 
     public DbSet<UserEntity> Users => Set<UserEntity>();
 
@@ -114,6 +123,83 @@ public class VHSmartDbContext(
             });
         });
 
+        modelBuilder.Entity<CompanyEntity>(entity =>
+        {
+            entity.ToTable("ComCompanies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.RegistrationType).HasMaxLength(100);
+            entity.Property(x => x.BusinessRegistrationNo).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.OwnerStatus).HasMaxLength(100);
+            entity.Property(x => x.Address1).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Address2).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Address3).HasMaxLength(200);
+            entity.Property(x => x.PostCode).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.City).HasMaxLength(100);
+            entity.Property(x => x.District).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.State).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Telephone).IsRequired().HasMaxLength(30);
+            entity.Property(x => x.Fax).HasMaxLength(30);
+            entity.Property(x => x.IndustrySize).HasMaxLength(100);
+            entity.Property(x => x.WebsiteUrl).HasMaxLength(200);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(254);
+            entity.Property(x => x.DateOfEstablishment).HasColumnType("date");
+            entity.Property(x => x.MainProductsServices).HasMaxLength(500);
+            entity.Property(x => x.Market).HasMaxLength(100);
+            entity.Property(x => x.IsActive).IsRequired();
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant root (Database.md 3): the row has no CompanyId, so it is deliberately not
+            // an ITenantEntity and only the IsDeleted filter applies (platform admin sees all).
+            // UQ BusinessRegistrationNo / Email among live rows (Database.md 3, spec 6.1): a
+            // soft delete frees both, the handlers return the friendly message instead of
+            // letting these fire.
+            entity.HasIndex(x => x.BusinessRegistrationNo)
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.Email)
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasOne(x => x.CertificationBody)
+                .WithMany()
+                .HasForeignKey(x => x.CertificationBodyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CertificationBodyId);
+            entity.HasOne<CountryEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CountryId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+        });
+
+        modelBuilder.Entity<CompanyBrandEntity>(entity =>
+        {
+            entity.ToTable("ComCompanyBrands");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (CompanyId, BrandId) among live rows (Database.md 3): unlinking is a soft
+            // delete, so the filtered index frees the pair and lets the same brand be re-linked.
+            entity.HasIndex(x => new { x.CompanyId, x.BrandId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.BrandId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany(x => x.Brands)
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Brand)
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<CountryEntity>(entity =>
         {
             entity.ToTable("AdmCountries");
@@ -147,9 +233,14 @@ public class VHSmartDbContext(
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
             entity.Property(x => x.SysUserModified).HasMaxLength(100);
-            // No FK: ComCompanies arrives with C-01. Indexed because the tenant filter runs on
-            // every reference-data list.
+            // Indexed because the tenant filter runs on every reference-data list; the ERD edge
+            // GeneralData }o--|| Company_Tenant is wired with C-01 (Restrict - deletes are
+            // always soft, CodingRules 7.1).
             entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
             // UQ (CompanyId, Group, Category, Name) among live rows (Database.md 3): a soft
             // delete frees the name. The handler returns the friendly message instead of
             // letting this fire.
@@ -183,9 +274,13 @@ public class VHSmartDbContext(
         {
             entity.ToTable("AdmRoles");
             entity.HasKey(x => x.Id);
-            // No FK: ComCompanies arrives with C-01. Null CompanyId = system role, and the
-            // tenant filter never applies to this table (Database.md 5), so the column is
-            // deliberately not part of an ITenantEntity.
+            // Null CompanyId = system role, and the tenant filter never applies to this table
+            // (Database.md 5), so the column is deliberately not part of an ITenantEntity; the
+            // nullable FK to ComCompanies is wired with C-01.
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
             entity.Property(x => x.Description).HasMaxLength(500);
             entity.Property(x => x.IsSystemRole).IsRequired();
@@ -253,6 +348,11 @@ public class VHSmartDbContext(
             // 3 defines none for this table, so the duplicate-name rule is a handler check (spec
             // 21.9) like the CB screen.
             entity.HasIndex(x => x.CompanyId);
+            // ERD edge ServiceProvider }o--|| Company_Tenant, wired with C-01.
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<CountryEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.CountryId)
@@ -315,9 +415,13 @@ public class VHSmartDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
-            // No FK: ComCompanies arrives with C-01. Indexed because login resolves the
-            // company list of one user on every sign-in.
+            // Indexed because login resolves the company list of one user on every sign-in; the
+            // FK to ComCompanies is wired with C-01.
             entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => new { x.UserId, x.CompanyId })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
@@ -356,6 +460,11 @@ public class VHSmartDbContext(
             // defines none for this table, so the duplicate-name rule (spec 21.9) is a handler
             // check, like Service Provider and CB.
             entity.HasIndex(x => x.CompanyId);
+            // ERD edge WebLink }o--|| Company_Tenant, wired with C-01.
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
             // Icon* is required on the spec 5.4 form, so the owned type is non-null (unlike the
             // optional Logo / ProfilePicture columns) and every column is NOT NULL.
             entity.OwnsOne(x => x.Icon, icon =>
@@ -378,9 +487,13 @@ public class VHSmartDbContext(
             entity.Property(x => x.Description).HasMaxLength(1000);
             entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
             entity.Property(x => x.SysUserModified).HasMaxLength(100);
-            // No FK: AdmCompanies arrives with C-01. Indexed because the tenant filter runs on
-            // every reference-data list.
+            // Indexed because the tenant filter runs on every reference-data list; the ERD edge
+            // SupportingDocument }o--|| Company_Tenant is wired with C-01.
             entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
             // UQ (CompanyId, ForView, DocumentSequence) among live rows (Database.md 3): a soft
             // delete frees the sequence. The handler returns the manual's message instead of
             // letting this fire (D-16).
@@ -395,6 +508,46 @@ public class VHSmartDbContext(
                 template.Property(f => f.StorageKey).HasMaxLength(100);
                 template.Property(f => f.ContentType).HasMaxLength(100);
             });
+        });
+
+        modelBuilder.Entity<SubscriptionPackageEntity>(entity =>
+        {
+            entity.ToTable("AdmSubscriptionPackages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // The 6 §21.5 packages (Database.md 5 "Seeded"); HasData runs once inside the
+            // migration, owner edits are never overwritten at startup.
+            entity.HasData(SubscriptionPackageSeedData.PackageEntities());
+        });
+
+        modelBuilder.Entity<CompanySubscriptionEntity>(entity =>
+        {
+            entity.ToTable("AdmCompanySubscriptions");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its Database.md string (CodingRules 11), e.g. "Renewal".
+            entity.Property(x => x.EntryType).IsRequired().HasMaxLength(20).HasConversion<string>();
+            entity.Property(x => x.Label).HasMaxLength(200);
+            entity.Property(x => x.DurationMonths).IsRequired();
+            entity.Property(x => x.StartDate).IsRequired().HasColumnType("date");
+            entity.Property(x => x.EndDate).IsRequired().HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Indexed because the tenant filter runs on every subscription read; the ERD edges
+            // CompanySubscription }o--|| Company_Tenant and "type of" -> AdmSubscriptionPackages
+            // are wired here (both Restrict, deletes are always soft - CodingRules 7.1).
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PackageId);
+            entity.HasOne<SubscriptionPackageEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PackageId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

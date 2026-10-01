@@ -158,6 +158,26 @@ public class LoginTests
     }
 
     [Fact]
+    public async Task Handle_NotActivatedUserWithoutPassword_ThrowsUnauthorized()
+    {
+        var databaseName = TestDbFactory.NewDatabaseName();
+        var db = await CreateDbAsync(databaseName);
+        var user = AddUser(db, "pending@example.com");
+        // C-02: before activation the account has no password at all; the guard must answer
+        // the same generic 401 as a wrong password instead of reaching the hasher.
+        user.PasswordHash = string.Empty;
+        user.IsActive = false;
+        db.SaveChanges();
+
+        var handler = new LoginHandler(db, new RecordingTokenService(), Config());
+
+        var exception = await Assert.ThrowsAsync<UnauthorizedException>(() =>
+            handler.Handle(new LoginCommand("pending@example.com", Password), CancellationToken.None));
+
+        Assert.Equal(LoginMessages.InvalidCredentials, exception.Message);
+    }
+
+    [Fact]
     public async Task Handle_EmailIsMatchedCaseInsensitively()
     {
         var databaseName = TestDbFactory.NewDatabaseName();

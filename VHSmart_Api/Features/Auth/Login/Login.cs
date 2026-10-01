@@ -59,6 +59,12 @@ public class LoginHandler(
         if (user.LockedUntil is { } lockedUntil && lockedUntil > DateTime.UtcNow)
             throw new UnauthorizedException(LoginMessages.Locked);
 
+        // An account that has not been activated yet has no password at all (C-02: the
+        // default password exists only after activation). Refuse before the hasher sees an
+        // empty string - same generic answer as a wrong password, no enumeration.
+        if (string.IsNullOrEmpty(user.PasswordHash))
+            throw new UnauthorizedException(LoginMessages.InvalidCredentials);
+
         var verification = UserPasswordHasher.Verify(user, user.PasswordHash, request.Password);
         if (verification == PasswordVerificationResult.Failed)
         {

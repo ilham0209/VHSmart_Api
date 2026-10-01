@@ -14,6 +14,7 @@ using VHSmart_Api.Shared.Infrastructure.Security;
 using VHSmart_Api.Shared.Infrastructure.Seeding;
 using VHSmart_Api.Shared.Infrastructure.Sequences;
 using VHSmart_Api.Shared.Infrastructure.Storage;
+using VHSmart_Api.Shared.Infrastructure.Subscriptions;
 using VHSmart_Api.Shared.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -42,6 +43,11 @@ builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBeh
 // VHSmartDbContext (F-08).
 builder.Services.AddScoped<IReferenceNumberGenerator, ReferenceNumberGenerator>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+
+// D-11: the 7-day expiry warning runs from a daily background job (never from a GET), one
+// scope per run so the processor gets its own VHSmartDbContext.
+builder.Services.AddScoped<SubscriptionExpiryWarningProcessor>();
+builder.Services.AddHostedService<SubscriptionExpiryWarningService>();
 
 // Relative FileStorage:RootPath is resolved against the content root; the storage root is
 // created lazily on the first upload.
@@ -141,6 +147,10 @@ app.UseMiddleware<GlobalExceptionHandlingMiddleware>();
 app.UseCors("CorsPolicy");
 
 app.UseAuthentication();
+
+// D-11: after the JWT is resolved (it reads the company claim), before authorization so an
+// expired subscription answers SUBSCRIPTION_EXPIRED instead of a permission 403.
+app.UseMiddleware<SubscriptionExpiryMiddleware>();
 
 app.UseAuthorization();
 

@@ -27,6 +27,8 @@ public class VHSmartDbContext(
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
 
+    public DbSet<CompanySubscriptionEntity> CompanySubscriptions => Set<CompanySubscriptionEntity>();
+
     public DbSet<CompanyEntity> Companies => Set<CompanyEntity>();
 
     public DbSet<CountryEntity> Countries => Set<CountryEntity>();
@@ -48,6 +50,8 @@ public class VHSmartDbContext(
     public DbSet<SupportingDocumentEntity> SupportingDocuments => Set<SupportingDocumentEntity>();
 
     public DbSet<StateEntity> States => Set<StateEntity>();
+
+    public DbSet<SubscriptionPackageEntity> SubscriptionPackages => Set<SubscriptionPackageEntity>();
 
     public DbSet<UserEntity> Users => Set<UserEntity>();
 
@@ -504,6 +508,46 @@ public class VHSmartDbContext(
                 template.Property(f => f.StorageKey).HasMaxLength(100);
                 template.Property(f => f.ContentType).HasMaxLength(100);
             });
+        });
+
+        modelBuilder.Entity<SubscriptionPackageEntity>(entity =>
+        {
+            entity.ToTable("AdmSubscriptionPackages");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Code).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // The 6 §21.5 packages (Database.md 5 "Seeded"); HasData runs once inside the
+            // migration, owner edits are never overwritten at startup.
+            entity.HasData(SubscriptionPackageSeedData.PackageEntities());
+        });
+
+        modelBuilder.Entity<CompanySubscriptionEntity>(entity =>
+        {
+            entity.ToTable("AdmCompanySubscriptions");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its Database.md string (CodingRules 11), e.g. "Renewal".
+            entity.Property(x => x.EntryType).IsRequired().HasMaxLength(20).HasConversion<string>();
+            entity.Property(x => x.Label).HasMaxLength(200);
+            entity.Property(x => x.DurationMonths).IsRequired();
+            entity.Property(x => x.StartDate).IsRequired().HasColumnType("date");
+            entity.Property(x => x.EndDate).IsRequired().HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Indexed because the tenant filter runs on every subscription read; the ERD edges
+            // CompanySubscription }o--|| Company_Tenant and "type of" -> AdmSubscriptionPackages
+            // are wired here (both Restrict, deletes are always soft - CodingRules 7.1).
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PackageId);
+            entity.HasOne<SubscriptionPackageEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PackageId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 

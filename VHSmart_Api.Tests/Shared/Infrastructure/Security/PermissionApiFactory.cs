@@ -5,21 +5,29 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
 namespace VHSmart_Api.Tests.Shared.Infrastructure.Security;
 
-// Boots the real pipeline - JWT bearer -> JwtCurrentUser -> fallback policy -> [HasPermission] -
-// around the fixture controllers above, with IPermissionService swapped for a stub. The signing
-// key is generated per factory, so no secret is ever written to source (D-29).
+// Boots the real pipeline - JWT bearer -> JwtCurrentUser -> SubscriptionExpiryMiddleware ->
+// fallback policy -> [HasPermission] - around the fixture controllers above, with
+// IPermissionService swapped for a stub. The signing key is generated per factory, so no
+// secret is ever written to source (D-29). The DbContext is swapped for an in-memory store
+// because the expiry middleware queries subscriptions on every authenticated request.
 public sealed class PermissionApiFactory : WebApplicationFactory<Program>
 {
     private static readonly string TestSigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
     private readonly HashSet<(Guid RoleId, string Key, PermissionAction Action)> _granted;
+
+    private readonly string _databaseName = $"VHSmartPermissionApiTests-{Guid.NewGuid():N}";
 
     public PermissionApiFactory(params (Guid RoleId, string Key, PermissionAction Action)[] granted) =>
         _granted = [.. granted];
@@ -59,6 +67,13 @@ public sealed class PermissionApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            // Tests never touch a real database. Both EF registrations have to be removed
+            // first, otherwise the SqlServer and the InMemory provider end up on one context.
+            services.RemoveAll<IDbContextOptionsConfiguration<VHSmartDbContext>>();
+            services.RemoveAll<DbContextOptions<VHSmartDbContext>>();
+            services.RemoveAll<DbContextOptions>();
+            services.AddDbContext<VHSmartDbContext>(options => options.UseInMemoryDatabase(_databaseName));
+
             services.AddSingleton<IPermissionService>(new StubPermissionService(_granted));
             services.AddControllers().AddApplicationPart(typeof(PermissionTestController).Assembly);
         });

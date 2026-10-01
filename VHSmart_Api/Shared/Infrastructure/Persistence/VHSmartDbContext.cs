@@ -49,6 +49,10 @@ public class VHSmartDbContext(
 
     public DbSet<ServiceProviderEntity> ServiceProviders => Set<ServiceProviderEntity>();
 
+    public DbSet<StaffAttachmentEntity> StaffAttachments => Set<StaffAttachmentEntity>();
+
+    public DbSet<StaffEntity> Staffs => Set<StaffEntity>();
+
     public DbSet<SupportingDocumentEntity> SupportingDocuments => Set<SupportingDocumentEntity>();
 
     public DbSet<StateEntity> States => Set<StateEntity>();
@@ -392,6 +396,92 @@ public class VHSmartDbContext(
                 .HasForeignKey(x => x.CountryId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.CountryId);
+        });
+
+        modelBuilder.Entity<StaffEntity>(entity =>
+        {
+            entity.ToTable("ComStaff");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(254);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.IdType).HasMaxLength(50);
+            entity.Property(x => x.IdNumber).HasMaxLength(50);
+            entity.Property(x => x.EmployeeIdNumber).HasMaxLength(50);
+            entity.Property(x => x.Gender).HasMaxLength(20);
+            entity.Property(x => x.Religion).HasMaxLength(50);
+            entity.Property(x => x.OfficeNumber).HasMaxLength(30);
+            entity.Property(x => x.MobileNumber).HasMaxLength(30);
+            entity.Property(x => x.TyphoidExpiryDate).HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (CompanyId, Email) among live rows (Database.md 3, spec 7.4): a soft delete
+            // frees the address, the handler answers the friendly 409 before this could fire.
+            entity.HasIndex(x => new { x.CompanyId, x.Email })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Title)
+                .WithMany()
+                .HasForeignKey(x => x.TitleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.TitleId);
+            entity.HasOne(x => x.Department)
+                .WithMany()
+                .HasForeignKey(x => x.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.DepartmentId);
+            entity.HasOne(x => x.Designation)
+                .WithMany()
+                .HasForeignKey(x => x.DesignationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.DesignationId);
+            entity.HasOne(x => x.IhcRole)
+                .WithMany()
+                .HasForeignKey(x => x.IhcRoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.IhcRoleId);
+            // Photo File? is optional (Database.md 3): nullable owned columns, exactly like
+            // AdmUsers.ProfilePicture.
+            entity.OwnsOne(x => x.Photo, photo =>
+            {
+                photo.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                photo.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                photo.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<StaffAttachmentEntity>(entity =>
+        {
+            entity.ToTable("ComStaffAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.StaffId);
+            entity.HasIndex(x => x.DocumentTypeId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Staff)
+                .WithMany()
+                .HasForeignKey(x => x.StaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.DocumentType)
+                .WithMany()
+                .HasForeignKey(x => x.DocumentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Document* is required (Database.md 3): the NOT NULL File column group.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
         });
 
         modelBuilder.Entity<StateEntity>(entity =>

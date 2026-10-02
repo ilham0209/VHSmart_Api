@@ -47,6 +47,14 @@ public class VHSmartDbContext(
 
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
+    public DbSet<PremiseEntity> Premises => Set<PremiseEntity>();
+
+    public DbSet<PremiseContactEntity> PremiseContacts => Set<PremiseContactEntity>();
+
+    public DbSet<PremiseHostelEntity> PremiseHostels => Set<PremiseHostelEntity>();
+
+    public DbSet<PremiseAttachmentEntity> PremiseAttachments => Set<PremiseAttachmentEntity>();
+
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
 
     public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
@@ -320,6 +328,168 @@ public class VHSmartDbContext(
                 document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
                 document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
                 document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<PremiseEntity>(entity =>
+        {
+            entity.ToTable("ComPremises");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its spec string (CodingRules 11), e.g. "CentralKitchen".
+            entity.Property(x => x.PremiseType).IsRequired().HasMaxLength(30).HasConversion<string>();
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(254);
+            entity.Property(x => x.StoreCode).HasMaxLength(50);
+            entity.Property(x => x.PremiseManagerName).HasMaxLength(200);
+            entity.Property(x => x.BusinessRegistrationNo).HasMaxLength(50);
+            entity.Property(x => x.GoogleMapLink).HasMaxLength(500);
+            entity.Property(x => x.Address1).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Address2).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Address3).HasMaxLength(200);
+            entity.Property(x => x.Postcode).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.City).HasMaxLength(100);
+            entity.Property(x => x.District).HasMaxLength(100);
+            entity.Property(x => x.State).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Telephone).IsRequired().HasMaxLength(30);
+            entity.Property(x => x.Fax).HasMaxLength(30);
+            entity.Property(x => x.OpeningDate).HasColumnType("date");
+            entity.Property(x => x.ClosingDate).HasColumnType("date");
+            // Status is a free string in Database.md 7 (spec 7.7 shows "e.g. ACTIVE" only).
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (CompanyId, Email) and (CompanyId, StoreCode) among live rows (Database.md 7,
+            // spec 7.7 [CODE]): a soft delete frees both; the handler answers the friendly 409
+            // first. StoreCode NULLs never collide (unique indexes ignore NULL).
+            entity.HasIndex(x => new { x.CompanyId, x.Email })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => new { x.CompanyId, x.StoreCode })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.CountryId);
+            entity.HasIndex(x => x.BrandId);
+            entity.HasIndex(x => x.PremiseManagerStaffId);
+            entity.HasIndex(x => x.AreaManagerStaffId);
+            entity.HasIndex(x => x.OperationManagerStaffId);
+            entity.HasIndex(x => x.PrayerRoomAvailabilityId);
+            entity.HasIndex(x => x.TagId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Country)
+                .WithMany()
+                .HasForeignKey(x => x.CountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Brand)
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.PremiseManager)
+                .WithMany()
+                .HasForeignKey(x => x.PremiseManagerStaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.AreaManager)
+                .WithMany()
+                .HasForeignKey(x => x.AreaManagerStaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.OperationManager)
+                .WithMany()
+                .HasForeignKey(x => x.OperationManagerStaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.PrayerRoomAvailability)
+                .WithMany()
+                .HasForeignKey(x => x.PrayerRoomAvailabilityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Tag)
+                .WithMany()
+                .HasForeignKey(x => x.TagId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PremiseContactEntity>(entity =>
+        {
+            entity.ToTable("ComPremiseContacts");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (PremiseId, StaffId) among live rows (Database.md 7): the contact list is
+            // replaced on save, so a removed contact frees the pair for a later re-pick.
+            entity.HasIndex(x => new { x.PremiseId, x.StaffId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Premise)
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Staff)
+                .WithMany()
+                .HasForeignKey(x => x.StaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PremiseHostelEntity>(entity =>
+        {
+            entity.ToTable("ComPremiseHostels");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.HostelName).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Address).HasMaxLength(500);
+            entity.Property(x => x.TenancyExpiryDate).HasColumnType("date");
+            entity.Property(x => x.ContactPerson).HasMaxLength(200);
+            entity.Property(x => x.PhoneNo).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Premise)
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PremiseAttachmentEntity>(entity =>
+        {
+            entity.ToTable("ComPremiseAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DocumentType).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.ExpiryDate).HasColumnType("date");
+            entity.Property(x => x.ReferenceNo).HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // One current row per (PremiseId, DocumentType) among live rows (Database.md 7):
+            // the upload replaces the row in place for its type, and a soft delete frees the
+            // pair for a later re-upload.
+            entity.HasIndex(x => new { x.PremiseId, x.DocumentType })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Premise)
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Required File group (Database.md 7): the columns are NOT NULL even though the
+            // navigation is always set by the upload path.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
             });
         });
 

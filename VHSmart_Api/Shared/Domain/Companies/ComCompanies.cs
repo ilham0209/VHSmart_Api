@@ -59,6 +59,11 @@ public class CompanyEntity : BaseClass
 
     public string? Market { get; set; }
 
+    // Spec 7.3 "No. of Employee" on Company > Profiles: a company-wide headcount the profile
+    // form edits (nullable = never filled in). Database.md 4 - the column was added by CI-03,
+    // nothing else on the General form (spec 7.1) touches it.
+    public int? NumberOfEmployees { get; set; }
+
     public bool IsActive { get; set; } = true;
 
     // Spec 6.3 / D-20: the brands a company uses are AdmGeneralData (COMPANY / Brand) rows

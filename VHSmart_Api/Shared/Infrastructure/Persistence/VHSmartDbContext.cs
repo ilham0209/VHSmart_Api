@@ -27,6 +27,8 @@ public class VHSmartDbContext(
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
 
+    public DbSet<CompanyContactEntity> CompanyContacts => Set<CompanyContactEntity>();
+
     public DbSet<CompanySubscriptionEntity> CompanySubscriptions => Set<CompanySubscriptionEntity>();
 
     public DbSet<CompanyEntity> Companies => Set<CompanyEntity>();
@@ -203,6 +205,35 @@ public class VHSmartDbContext(
             entity.HasOne(x => x.Brand)
                 .WithMany()
                 .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CompanyContactEntity>(entity =>
+        {
+            entity.ToTable("ComCompanyContacts");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its spec string (CodingRules 11), e.g. "HalalExecutive".
+            entity.Property(x => x.Kind).IsRequired().HasMaxLength(30).HasConversion<string>();
+            entity.Property(x => x.WorkingHourFrom).HasColumnType("time");
+            entity.Property(x => x.WorkingHourTo).HasColumnType("time");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (CompanyId, Kind, StaffId) among live rows (Database.md 4): a soft delete
+            // frees the pair so the same staff member can be picked again later. The screen
+            // keeps one live row per kind and reconciles in the handler, so this never fires
+            // on a save - the index only protects data loaded from elsewhere.
+            entity.HasIndex(x => new { x.CompanyId, x.Kind, x.StaffId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.StaffId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Staff)
+                .WithMany()
+                .HasForeignKey(x => x.StaffId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

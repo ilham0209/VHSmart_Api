@@ -41,6 +41,10 @@ public class VHSmartDbContext(
 
     public DbSet<HalalPolicyEntity> HalalPolicies => Set<HalalPolicyEntity>();
 
+    public DbSet<MinutesMeetingEntity> MinutesMeetings => Set<MinutesMeetingEntity>();
+
+    public DbSet<MinutesMeetingAttachmentEntity> MinutesMeetingAttachments => Set<MinutesMeetingAttachmentEntity>();
+
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
@@ -267,6 +271,50 @@ public class VHSmartDbContext(
             entity.HasIndex(x => x.SchemeId);
             // Document* is required (Database.md 3): the NOT NULL File column group; the bytes
             // stay in IFileStorage, the row only carries the metadata.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<MinutesMeetingEntity>(entity =>
+        {
+            entity.ToTable("ComMinutesMeetings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.MeetingDate).HasColumnType("date");
+            entity.Property(x => x.StartTime).HasColumnType("time");
+            entity.Property(x => x.EndTime).HasColumnType("time");
+            entity.Property(x => x.Location).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MinutesMeetingAttachmentEntity>(entity =>
+        {
+            entity.ToTable("ComMinutesMeetingAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.MinutesMeetingId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.MinutesMeeting)
+                .WithMany()
+                .HasForeignKey(x => x.MinutesMeetingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Document File is optional (Database.md 4 marks no asterisk): nullable owned
+            // columns, same shape as the training module document.
             entity.OwnsOne(x => x.Document, document =>
             {
                 document.Property(f => f.FileName).IsRequired().HasMaxLength(260);

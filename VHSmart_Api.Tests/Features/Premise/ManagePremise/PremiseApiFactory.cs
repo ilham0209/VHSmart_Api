@@ -206,6 +206,23 @@ internal sealed class PremiseApiFactory : WebApplicationFactory<Program>
         return row.Id;
     }
 
+    // COMPANY / "Premise Tag" under this factory's company (the Tag link values).
+    public async Task<Guid> SeedPremiseTagAsync(string name = "Complete Documentation")
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VHSmartDbContext>();
+        var row = new GeneralDataEntity
+        {
+            CompanyId = CompanyId,
+            Group = GeneralDataGroup.COMPANY,
+            Category = "Premise Tag",
+            Name = name
+        };
+        db.GeneralData.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
     // A premise row - by default under this factory's company; the tests pass companyId for
     // another tenant's row (the FK needs that company to exist first).
     public async Task<Guid> SeedPremiseAsync(

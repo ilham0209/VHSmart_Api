@@ -343,6 +343,7 @@ public class PremiseApiTests
         await factory.SeedDatabaseAsync();
         await factory.SeedStaffAsync("Nur Aisyah");
         await factory.SeedPrayerRoomAsync();
+        await factory.SeedPremiseTagAsync();
         using var client = CreateAuthorizedClient(factory);
 
         var response = await client.GetAsync($"{Route}/options");
@@ -355,6 +356,167 @@ public class PremiseApiTests
         Assert.Contains("CentralKitchen", options.PremiseTypes);
         Assert.Equal("Available",
             Assert.Single(options.PrayerRoomAvailabilities).Name);
+        Assert.Equal("Complete Documentation",
+            Assert.Single(options.PremiseTags).Name);
         Assert.Equal("Nur Aisyah", Assert.Single(options.Staff).Name);
+    }
+
+    // The "Supporting Document" dialog (spec 7.7): fixed type, expiry, reference, PDF file.
+    private static MultipartFormDataContent AttachmentForm(
+        string documentType = "HALAL CERTIFICATE",
+        string? expiryDate = "2099-06-01",
+        string fileName = "halal-cert.pdf")
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent(documentType), "DocumentType");
+        if (expiryDate is not null)
+            content.Add(new StringContent(expiryDate), "ExpiryDate");
+        content.Add(new StringContent("HC-001"), "ReferenceNo");
+        var file = new ByteArrayContent([37, 80, 68, 70]);
+        file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+        content.Add(file, "File", fileName);
+        return content;
+    }
+
+    [Fact]
+    public async Task UploadAttachment_WithoutCreatePermission_ReturnsForbidden()
+    {
+        using var factory = new PremiseApiFactory(grantCreate: false);
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = AttachmentForm();
+        var response = await client.PostAsync(
+            $"{Route}/{premiseId}/attachments", form);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Attachments_UploadListDownloadAndTag_Flow()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync(name: "Tagged premise");
+        var tagId = await factory.SeedPremiseTagAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = AttachmentForm();
+        var uploadResponse = await client.PostAsync(
+            $"{Route}/{premiseId}/attachments", form);
+        var tab = await uploadResponse.Content
+            .ReadFromJsonAsync<IReadOnlyList<PremiseAttachmentResponse>>(Json);
+
+        Assert.Equal(HttpStatusCode.OK, uploadResponse.StatusCode);
+        Assert.NotNull(tab);
+        Assert.Equal(5, tab.Count);
+        var uploaded = tab.Single(row => row.DocumentType == "HALAL CERTIFICATE");
+        Assert.NotNull(uploaded.Id);
+        Assert.Equal("halal-cert.pdf", uploaded.FileName);
+        Assert.All(tab.Where(row => row.Id is null), row => Assert.Null(row.FileName));
+
+        var listResponse = await client.GetAsync($"{Route}/{premiseId}/attachments");
+        var listed = await listResponse.Content
+            .ReadFromJsonAsync<IReadOnlyList<PremiseAttachmentResponse>>(Json);
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        Assert.NotNull(listed);
+
+        var documentResponse = await client.GetAsync(
+            $"{Route}/{premiseId}/attachments/{uploaded.Id}/document");
+        Assert.Equal(HttpStatusCode.OK, documentResponse.StatusCode);
+        Assert.Equal("application/pdf",
+            documentResponse.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("%PDF", await documentResponse.Content.ReadAsStringAsync());
+
+        // Document Status on the list: four types are still missing (D-15).
+        var tagResponse = await client.PutAsJsonAsync(
+            $"{Route}/{premiseId}/tag", new { tagId }, Json);
+        var gridResponse = await client.GetAsync(Route);
+        var grid = await gridResponse.Content
+            .ReadFromJsonAsync<DataGridResponse<GetAllPremisesResponse>>(Json);
+
+        Assert.Equal(HttpStatusCode.NoContent, tagResponse.StatusCode);
+        Assert.NotNull(grid);
+        var row = Assert.Single(grid.Data);
+        Assert.Equal(tagId, row.TagId);
+        Assert.Equal("Complete Documentation", row.TagName);
+        Assert.Equal("NOT COMPLETE DOCUMENTATION", row.DocumentStatus);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_NonPdf_ReturnsUnprocessableEntity()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = AttachmentForm(fileName: "payload.docx");
+        var response = await client.PostAsync(
+            $"{Route}/{premiseId}/attachments", form);
+
+        // D-22: server-side PDF-only check (BusinessRuleException -> 422).
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_UnknownDocumentType_ReturnsBadRequest()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = AttachmentForm(documentType: "STAMP");
+        var response = await client.PostAsync(
+            $"{Route}/{premiseId}/attachments", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachment_UnknownPremise_ReturnsNotFound()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = AttachmentForm();
+        var response = await client.PostAsync(
+            $"{Route}/{Guid.NewGuid()}/attachments", form);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTag_UnknownTag_ReturnsBadRequest()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{premiseId}/tag", new { tagId = Guid.NewGuid() }, Json);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UpdateTag_ForeignPremise_ReturnsNotFound()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        var foreignCompany = await factory.SeedForeignCompanyAsync();
+        var foreignId = await factory.SeedPremiseAsync(
+            "Foreign premise", companyId: foreignCompany);
+        var tagId = await factory.SeedPremiseTagAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{foreignId}/tag", new { tagId }, Json);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

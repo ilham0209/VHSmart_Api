@@ -53,6 +53,8 @@ public class VHSmartDbContext(
 
     public DbSet<PremiseHostelEntity> PremiseHostels => Set<PremiseHostelEntity>();
 
+    public DbSet<PremiseAttachmentEntity> PremiseAttachments => Set<PremiseAttachmentEntity>();
+
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
 
     public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
@@ -454,6 +456,41 @@ public class VHSmartDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.PremiseId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PremiseAttachmentEntity>(entity =>
+        {
+            entity.ToTable("ComPremiseAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DocumentType).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.ExpiryDate).HasColumnType("date");
+            entity.Property(x => x.ReferenceNo).HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // One current row per (PremiseId, DocumentType) among live rows (Database.md 7):
+            // the upload replaces the row in place for its type, and a soft delete frees the
+            // pair for a later re-upload.
+            entity.HasIndex(x => new { x.PremiseId, x.DocumentType })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Premise)
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Required File group (Database.md 7): the columns are NOT NULL even though the
+            // navigation is always set by the upload path.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
+            });
         });
 
         modelBuilder.Entity<CountryEntity>(entity =>

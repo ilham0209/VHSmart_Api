@@ -59,4 +59,20 @@ public class GetPremiseOptionsTests
         Assert.False(string.IsNullOrWhiteSpace(staff.Email));
         Assert.Equal("0123456789", staff.MobileNumber);
     }
+
+    [Fact]
+    public async Task Handle_PremiseTags_AreOwnCompanyOnly()
+    {
+        var user = PremiseTestData.CompanyUser();
+        var otherCompany = PremiseTestData.CompanyUser();
+        var db = await PremiseTestData.CreateDbAsync(user);
+        await PremiseTestData.SeedPremiseTagAsync(db, user.CompanyId, "Complete Documentation");
+        await PremiseTestData.SeedPremiseTagAsync(db, otherCompany.CompanyId, "Foreign tag");
+
+        var response = await new GetPremiseOptionsHandler(db, user)
+            .Handle(new GetPremiseOptionsQuery(), CancellationToken.None);
+
+        var tag = Assert.Single(response.PremiseTags);
+        Assert.Equal("Complete Documentation", tag.Name);
+    }
 }

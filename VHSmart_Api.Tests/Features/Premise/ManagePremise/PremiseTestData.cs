@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.Premise.ManagePremise;
+using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
 
@@ -118,6 +119,55 @@ internal static class PremiseTestData
             Name = name
         };
         db.GeneralData.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // COMPANY / "Premise Tag" (Database.md AdmGeneralData table) - the Tag link values.
+    public static async Task<Guid> SeedPremiseTagAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId,
+        string name = "Complete Documentation")
+    {
+        var row = new GeneralDataEntity
+        {
+            CompanyId = companyId,
+            Group = GeneralDataGroup.COMPANY,
+            Category = "Premise Tag",
+            Name = name
+        };
+        db.GeneralData.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // One ComPremiseAttachments row inserted directly (list/status/download tests). The
+    // stored file is a dummy unless the test passes a real one from LocalFileStorage.
+    public static async Task<Guid> SeedPremiseAttachmentAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId,
+        Guid premiseId,
+        string documentType,
+        DateTime? expiryDate = null,
+        string? referenceNo = null,
+        StoredFile? document = null)
+    {
+        var row = new PremiseAttachmentEntity
+        {
+            CompanyId = companyId,
+            PremiseId = premiseId,
+            DocumentType = documentType,
+            ExpiryDate = expiryDate,
+            ReferenceNo = referenceNo,
+            Document = document ?? new StoredFile
+            {
+                FileName = $"{documentType.ToLowerInvariant().Replace(' ', '-')}.pdf",
+                StorageKey = Guid.NewGuid().ToString("D"),
+                ContentType = "application/pdf",
+                SizeBytes = 4
+            }
+        };
+        db.PremiseAttachments.Add(row);
         await db.SaveChangesAsync();
         return row.Id;
     }

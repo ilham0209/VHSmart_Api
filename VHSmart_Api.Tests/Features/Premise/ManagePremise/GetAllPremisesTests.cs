@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.Premise.ManagePremise;
+using VHSmart_Api.Shared.Domain.Calculators;
 using VHSmart_Api.Shared.Domain.Companies;
 using VHSmart_Api.Shared.Models;
 
@@ -120,5 +121,64 @@ public class GetAllPremisesTests
             .Handle(new GetAllPremisesQuery(), CancellationToken.None);
 
         Assert.Equal(0, grid.TotalRecords);
+    }
+
+    [Fact]
+    public async Task Handle_DocumentStatus_IsComputedPerD15ForThePage()
+    {
+        var user = PremiseTestData.CompanyUser();
+        var db = await PremiseTestData.CreateDbAsync(user);
+        var bareId = await PremiseTestData.SeedPremiseAsync(db, user.CompanyId, "Bare premise");
+        var completeId = await PremiseTestData.SeedPremiseAsync(
+            db, user.CompanyId, "Complete premise");
+        var expiredId = await PremiseTestData.SeedPremiseAsync(
+            db, user.CompanyId, "Expired premise");
+        foreach (var documentType in PremiseDocumentStatusCalculator.RequiredDocumentTypes)
+        {
+            await PremiseTestData.SeedPremiseAttachmentAsync(
+                db, user.CompanyId, completeId, documentType);
+            // One of the five is expired (D-15 counts the types, not the rows).
+            await PremiseTestData.SeedPremiseAttachmentAsync(
+                db, user.CompanyId, expiredId, documentType,
+                expiryDate: documentType == "HALAL CERTIFICATE"
+                    ? new DateTime(2020, 1, 1)
+                    : null);
+        }
+
+        var grid = await new GetAllPremisesHandler(db, user)
+            .Handle(new GetAllPremisesQuery(), CancellationToken.None);
+
+        // D-15 order: no uploads -> NOT COMPLETE; all five -> COMPLETE; one expired -> n OF.
+        Assert.Equal(PremiseDocumentStatusCalculator.NotCompleteText,
+            grid.Data.Single(row => row.Id == bareId).DocumentStatus);
+        Assert.Equal(PremiseDocumentStatusCalculator.CompleteText,
+            grid.Data.Single(row => row.Id == completeId).DocumentStatus);
+        Assert.Equal("1 OF THE DOCUMENT HAS EXPIRED",
+            grid.Data.Single(row => row.Id == expiredId).DocumentStatus);
+    }
+
+    [Fact]
+    public async Task Handle_Tag_JoinsItsNameAndStaysEmptyWhenUntagged()
+    {
+        var user = PremiseTestData.CompanyUser();
+        var otherCompany = PremiseTestData.CompanyUser();
+        var db = await PremiseTestData.CreateDbAsync(user);
+        var tagId = await PremiseTestData.SeedPremiseTagAsync(db, user.CompanyId, "Complete Documentation");
+        await PremiseTestData.SeedPremiseTagAsync(db, otherCompany.CompanyId, "Foreign tag");
+        var taggedId = await PremiseTestData.SeedPremiseAsync(db, user.CompanyId, "Tagged premise");
+        var untaggedId = await PremiseTestData.SeedPremiseAsync(db, user.CompanyId, "Untagged premise");
+        var tagged = await db.Premises.SingleAsync(row => row.Id == taggedId);
+        tagged.TagId = tagId;
+        await db.SaveChangesAsync();
+
+        var grid = await new GetAllPremisesHandler(db, user)
+            .Handle(new GetAllPremisesQuery(), CancellationToken.None);
+
+        var taggedRow = grid.Data.Single(row => row.Id == taggedId);
+        Assert.Equal(tagId, taggedRow.TagId);
+        Assert.Equal("Complete Documentation", taggedRow.TagName);
+        var untaggedRow = grid.Data.Single(row => row.Id == untaggedId);
+        Assert.Null(untaggedRow.TagId);
+        Assert.Equal(string.Empty, untaggedRow.TagName);
     }
 }

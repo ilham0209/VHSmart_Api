@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using VHSmart_Api.Shared.Infrastructure.Persistence;
 namespace VHSmart_Api.Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(VHSmartDbContext))]
-    partial class VHSmartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261002010112_ComTrainings")]
+    partial class ComTrainings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4611,98 +4614,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("ComHalalPolicies", (string)null);
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.MinutesMeetingAttachmentEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("MinutesMeetingId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("MinutesMeetingId");
-
-                    b.ToTable("ComMinutesMeetingAttachments", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.MinutesMeetingEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<TimeOnly>("EndTime")
-                        .HasColumnType("time");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Location")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("MeetingDate")
-                        .HasColumnType("date");
-
-                    b.Property<TimeOnly>("StartTime")
-                        .HasColumnType("time");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.ToTable("ComMinutesMeetings", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.StaffAttachmentEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5375,65 +5286,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Scheme");
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.MinutesMeetingAttachmentEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.MinutesMeetingEntity", "MinutesMeeting")
-                        .WithMany()
-                        .HasForeignKey("MinutesMeetingId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Document", b1 =>
-                        {
-                            b1.Property<Guid>("MinutesMeetingAttachmentEntityId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.Property<string>("FileName")
-                                .IsRequired()
-                                .HasMaxLength(260)
-                                .HasColumnType("nvarchar(260)");
-
-                            b1.Property<long>("SizeBytes")
-                                .HasColumnType("bigint");
-
-                            b1.Property<string>("StorageKey")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.HasKey("MinutesMeetingAttachmentEntityId");
-
-                            b1.ToTable("ComMinutesMeetingAttachments");
-
-                            b1.WithOwner()
-                                .HasForeignKey("MinutesMeetingAttachmentEntityId");
-                        });
-
-                    b.Navigation("Document");
-
-                    b.Navigation("MinutesMeeting");
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.MinutesMeetingEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.StaffAttachmentEntity", b =>

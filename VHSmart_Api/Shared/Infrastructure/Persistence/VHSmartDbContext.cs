@@ -27,6 +27,8 @@ public class VHSmartDbContext(
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
 
+    public DbSet<CompanyContactEntity> CompanyContacts => Set<CompanyContactEntity>();
+
     public DbSet<CompanySubscriptionEntity> CompanySubscriptions => Set<CompanySubscriptionEntity>();
 
     public DbSet<CompanyEntity> Companies => Set<CompanyEntity>();
@@ -36,6 +38,12 @@ public class VHSmartDbContext(
     public DbSet<DocumentSequenceEntity> DocumentSequences => Set<DocumentSequenceEntity>();
 
     public DbSet<GeneralDataEntity> GeneralData => Set<GeneralDataEntity>();
+
+    public DbSet<HalalPolicyEntity> HalalPolicies => Set<HalalPolicyEntity>();
+
+    public DbSet<MinutesMeetingEntity> MinutesMeetings => Set<MinutesMeetingEntity>();
+
+    public DbSet<MinutesMeetingAttachmentEntity> MinutesMeetingAttachments => Set<MinutesMeetingAttachmentEntity>();
 
     public DbSet<NotificationEntity> Notifications => Set<NotificationEntity>();
 
@@ -47,11 +55,21 @@ public class VHSmartDbContext(
 
     public DbSet<ServiceProviderEntity> ServiceProviders => Set<ServiceProviderEntity>();
 
+    public DbSet<StaffAttachmentEntity> StaffAttachments => Set<StaffAttachmentEntity>();
+
+    public DbSet<StaffEntity> Staffs => Set<StaffEntity>();
+
     public DbSet<SupportingDocumentEntity> SupportingDocuments => Set<SupportingDocumentEntity>();
 
     public DbSet<StateEntity> States => Set<StateEntity>();
 
     public DbSet<SubscriptionPackageEntity> SubscriptionPackages => Set<SubscriptionPackageEntity>();
+
+    public DbSet<TrainingEntity> Trainings => Set<TrainingEntity>();
+
+    public DbSet<TrainingAttendeeEntity> TrainingAttendees => Set<TrainingAttendeeEntity>();
+
+    public DbSet<TrainingModuleEntity> TrainingModules => Set<TrainingModuleEntity>();
 
     public DbSet<UserEntity> Users => Set<UserEntity>();
 
@@ -198,6 +216,111 @@ public class VHSmartDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.BrandId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CompanyContactEntity>(entity =>
+        {
+            entity.ToTable("ComCompanyContacts");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its spec string (CodingRules 11), e.g. "HalalExecutive".
+            entity.Property(x => x.Kind).IsRequired().HasMaxLength(30).HasConversion<string>();
+            entity.Property(x => x.WorkingHourFrom).HasColumnType("time");
+            entity.Property(x => x.WorkingHourTo).HasColumnType("time");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (CompanyId, Kind, StaffId) among live rows (Database.md 4): a soft delete
+            // frees the pair so the same staff member can be picked again later. The screen
+            // keeps one live row per kind and reconciles in the handler, so this never fires
+            // on a save - the index only protects data loaded from elsewhere.
+            entity.HasIndex(x => new { x.CompanyId, x.Kind, x.StaffId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.StaffId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Staff)
+                .WithMany()
+                .HasForeignKey(x => x.StaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<HalalPolicyEntity>(entity =>
+        {
+            entity.ToTable("ComHalalPolicies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.PolicyDate).HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // One policy per scheme per company among live rows (Database.md 3, spec 7.2
+            // [VERIFY] default "enforce"): deleting the row frees the pair for a re-upload.
+            entity.HasIndex(x => new { x.CompanyId, x.SchemeId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Scheme)
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            // Document* is required (Database.md 3): the NOT NULL File column group; the bytes
+            // stay in IFileStorage, the row only carries the metadata.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<MinutesMeetingEntity>(entity =>
+        {
+            entity.ToTable("ComMinutesMeetings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Title).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.MeetingDate).HasColumnType("date");
+            entity.Property(x => x.StartTime).HasColumnType("time");
+            entity.Property(x => x.EndTime).HasColumnType("time");
+            entity.Property(x => x.Location).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MinutesMeetingAttachmentEntity>(entity =>
+        {
+            entity.ToTable("ComMinutesMeetingAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.MinutesMeetingId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.MinutesMeeting)
+                .WithMany()
+                .HasForeignKey(x => x.MinutesMeetingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Document File is optional (Database.md 4 marks no asterisk): nullable owned
+            // columns, same shape as the training module document.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
         });
 
         modelBuilder.Entity<CountryEntity>(entity =>
@@ -358,6 +481,174 @@ public class VHSmartDbContext(
                 .HasForeignKey(x => x.CountryId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasIndex(x => x.CountryId);
+        });
+
+        modelBuilder.Entity<StaffEntity>(entity =>
+        {
+            entity.ToTable("ComStaff");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Email).IsRequired().HasMaxLength(254);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.IdType).HasMaxLength(50);
+            entity.Property(x => x.IdNumber).HasMaxLength(50);
+            entity.Property(x => x.EmployeeIdNumber).HasMaxLength(50);
+            entity.Property(x => x.Gender).HasMaxLength(20);
+            entity.Property(x => x.Religion).HasMaxLength(50);
+            entity.Property(x => x.OfficeNumber).HasMaxLength(30);
+            entity.Property(x => x.MobileNumber).HasMaxLength(30);
+            entity.Property(x => x.TyphoidExpiryDate).HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (CompanyId, Email) among live rows (Database.md 3, spec 7.4): a soft delete
+            // frees the address, the handler answers the friendly 409 before this could fire.
+            entity.HasIndex(x => new { x.CompanyId, x.Email })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Title)
+                .WithMany()
+                .HasForeignKey(x => x.TitleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.TitleId);
+            entity.HasOne(x => x.Department)
+                .WithMany()
+                .HasForeignKey(x => x.DepartmentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.DepartmentId);
+            entity.HasOne(x => x.Designation)
+                .WithMany()
+                .HasForeignKey(x => x.DesignationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.DesignationId);
+            entity.HasOne(x => x.IhcRole)
+                .WithMany()
+                .HasForeignKey(x => x.IhcRoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.IhcRoleId);
+            // Photo File? is optional (Database.md 3): nullable owned columns, exactly like
+            // AdmUsers.ProfilePicture.
+            entity.OwnsOne(x => x.Photo, photo =>
+            {
+                photo.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                photo.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                photo.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<StaffAttachmentEntity>(entity =>
+        {
+            entity.ToTable("ComStaffAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.StaffId);
+            entity.HasIndex(x => x.DocumentTypeId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Staff)
+                .WithMany()
+                .HasForeignKey(x => x.StaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.DocumentType)
+                .WithMany()
+                .HasForeignKey(x => x.DocumentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Document* is required (Database.md 3): the NOT NULL File column group.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<TrainingEntity>(entity =>
+        {
+            entity.ToTable("ComTrainings");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its spec string (CodingRules 11), e.g. "SlaughtermanHalalChecker".
+            entity.Property(x => x.TrainingType).IsRequired().HasMaxLength(30).HasConversion<string>();
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.TrainingDate).HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (CompanyId, Name) among live rows (Database.md 6, spec 7.5 [CODE] "unique
+            // training name"): a soft delete frees the name; the handler answers the friendly
+            // 409 before this could fire.
+            entity.HasIndex(x => new { x.CompanyId, x.Name })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TrainingAttendeeEntity>(entity =>
+        {
+            entity.ToTable("ComTrainingAttendees");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // UQ (TrainingId, StaffId) among live rows (Database.md 6): the attendance list is
+            // replaced on save, so a removed attendee frees the pair for a later re-pick.
+            entity.HasIndex(x => new { x.TrainingId, x.StaffId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.StaffId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Training)
+                .WithMany()
+                .HasForeignKey(x => x.TrainingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Staff)
+                .WithMany()
+                .HasForeignKey(x => x.StaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TrainingModuleEntity>(entity =>
+        {
+            entity.ToTable("ComTrainingModules");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ModuleName).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasIndex(x => x.TrainingId);
+            entity.HasIndex(x => x.ModuleTypeId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Training)
+                .WithMany()
+                .HasForeignKey(x => x.TrainingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ModuleType)
+                .WithMany()
+                .HasForeignKey(x => x.ModuleTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Document File is optional (Database.md 6 marks no asterisk): nullable owned
+            // columns, same shape as StaffEntity.Photo.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
         });
 
         modelBuilder.Entity<StateEntity>(entity =>

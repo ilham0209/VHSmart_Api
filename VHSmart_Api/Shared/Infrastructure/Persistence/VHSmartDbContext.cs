@@ -58,6 +58,11 @@ public class VHSmartDbContext(
 
     public DbSet<PremiseAttachmentEntity> PremiseAttachments => Set<PremiseAttachmentEntity>();
 
+    public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
+        Set<RawMaterialAccessibleCompanyEntity>();
+
+    public DbSet<RawMaterialEntity> RawMaterials => Set<RawMaterialEntity>();
+
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
 
     public DbSet<RolePermissionEntity> RolePermissions => Set<RolePermissionEntity>();
@@ -608,6 +613,68 @@ public class VHSmartDbContext(
             });
         });
 
+        modelBuilder.Entity<RawMaterialEntity>(entity =>
+        {
+            entity.ToTable("RawMaterials");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its spec string (CodingRules 11), e.g. "Supporting".
+            entity.Property(x => x.Category).IsRequired().HasMaxLength(20).HasConversion<string>();
+            entity.Property(x => x.Ingredient).HasMaxLength(200);
+            entity.Property(x => x.IngredientCode).HasMaxLength(50);
+            entity.Property(x => x.CommercialName).HasMaxLength(200);
+            entity.Property(x => x.ScientificName).HasMaxLength(200);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 8): CompanyId from the JWT, indexed because the global
+            // query filter runs on every list.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.IngredientStatusId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.IngredientStatusId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.IngredientSourceId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.IngredientSourceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ManufacturerSupplierId);
+            entity.HasOne<ManufacturerSupplierEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ManufacturerSupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // D-17: the ingredient code is unique per company among live rows. A blank code is
+            // not compared (the spec form does not require one) and a soft delete frees it; the
+            // handler returns the friendly message instead of letting this fire.
+            entity.HasIndex(x => new { x.CompanyId, x.IngredientCode })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0 AND [IngredientCode] IS NOT NULL");
+        });
+
+        modelBuilder.Entity<RawMaterialAccessibleCompanyEntity>(entity =>
+        {
+            entity.ToTable("RawMaterialAccessibleCompanies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // No CompanyId here (Database.md 8 is not marked [T]): the row belongs to the raw
+            // material, and AccessibleCompanyId is the shared-with company.
+            entity.HasIndex(x => x.RawMaterialId);
+            entity.HasOne<RawMaterialEntity>()
+                .WithMany(x => x.AccessibleCompanies)
+                .HasForeignKey(x => x.RawMaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AccessibleCompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AccessibleCompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<NotificationEntity>(entity =>
         {
             entity.ToTable("AdmNotifications");
@@ -1136,6 +1203,11 @@ public class VHSmartDbContext(
             if (entityType.IsOwned() || !typeof(BaseClass).IsAssignableFrom(entityType.ClrType))
                 continue;
 
+            // RawMaterials carries the special "Accessible For" rule of CodingRules 7.3 and is
+            // configured after the loop.
+            if (entityType.ClrType == typeof(RawMaterialEntity))
+                continue;
+
             var parameter = Expression.Parameter(entityType.ClrType, "e");
             var notDeleted = Expression.Equal(
                 Expression.Property(parameter, nameof(BaseClass.IsDeleted)),
@@ -1156,5 +1228,15 @@ public class VHSmartDbContext(
 
             modelBuilder.Entity(entityType.ClrType).HasQueryFilter(Expression.Lambda(body, parameter));
         }
+
+        // CodingRules 7.3 / spec 10.2: a raw material is visible to its owner company, to a
+        // company listed in RawMaterialAccessibleCompanies ("Accessible For", >= 1 row) and to a
+        // Switch Company = ALL token - in handlers as here, nowhere else.
+        modelBuilder.Entity<RawMaterialEntity>().HasQueryFilter(row =>
+            !row.IsDeleted
+            && (CurrentIsPlatformAdminViewAll
+                || row.CompanyId == CurrentCompanyId
+                || row.AccessibleCompanies.Any(company =>
+                    !company.IsDeleted && company.AccessibleCompanyId == CurrentCompanyId)));
     }
 }

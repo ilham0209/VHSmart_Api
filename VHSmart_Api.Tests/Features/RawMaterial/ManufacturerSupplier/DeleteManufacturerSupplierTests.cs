@@ -63,6 +63,34 @@ public class DeleteManufacturerSupplierTests
     }
 
     [Fact]
+    public async Task Handle_RowUsedByARawMaterial_ThrowsBusinessRule()
+    {
+        var user = new TestCurrentUser(Guid.NewGuid().ToString(), CompanyA);
+        var db = await CreateDbAsync(user);
+        var row = NewRow(CompanyA, "manufacturer@example.com");
+        db.ManufacturerSuppliers.Add(row);
+        await db.SaveChangesAsync();
+        // RawMaterials (RM-02) now exists, so the guard deferred in RM-01 can run.
+        db.RawMaterials.Add(new RawMaterialEntity
+        {
+            CompanyId = CompanyA,
+            Category = RawMaterialCategory.Core,
+            IngredientStatusId = Guid.NewGuid(),
+            Ingredient = "Rice Flour",
+            IngredientCode = "RM-001",
+            ManufacturerSupplierId = row.Id
+        });
+        await db.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            new DeleteManufacturerSupplierHandler(db)
+                .Handle(new DeleteManufacturerSupplierCommand(row.Id), CancellationToken.None));
+
+        Assert.Equal("This manufacturer and supplier is used by a raw material.", exception.Message);
+        Assert.False((await db.ManufacturerSuppliers.IgnoreQueryFilters().SingleAsync()).IsDeleted);
+    }
+
+    [Fact]
     public async Task Handle_CrossCompanyRow_ThrowsNotFound()
     {
         var databaseName = TestDbFactory.NewDatabaseName();

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.RawMaterial.MasterList;
+using VHSmart_Api.Shared.Domain.Calculators;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Models;
 using static VHSmart_Api.Tests.Features.RawMaterial.MasterList.RawMaterialTestData;
@@ -151,5 +152,63 @@ public class GetAllRawMaterialsTests
         Assert.Equal(
             new[] { "Rice Flour", "Corn Flour" },
             result.Data.Select(row => row.Ingredient).ToArray());
+    }
+
+    [Fact]
+    public async Task Handle_CertificateRow_ShowsTheHalalInformationColumn()
+    {
+        var db = await CreateDbAsync(UserA());
+        var id = await SeedRowAsync(db);
+        var certificate = await SeedSupportingDocumentAsync(db, "HALAL CERTIFICATE");
+        await SeedAttachmentAsync(
+            db, id, certificate,
+            expiryDate: new DateTime(2099, 6, 1), referenceNo: "HC-001", authority: "JAKIM");
+
+        var result = await new GetAllRawMaterialsHandler(db)
+            .Handle(new GetAllRawMaterialsQuery(), CancellationToken.None);
+
+        var info = Assert.Single(result.Data).HalalInformation;
+        Assert.NotNull(info);
+        Assert.Equal("HC-001", info.ReferenceNo);
+        Assert.Equal("JAKIM", info.Authority);
+        Assert.Equal(new DateOnly(2099, 6, 1), info.ExpiryDate);
+        Assert.Equal(HalalStatus.Valid, info.Status);
+    }
+
+    [Fact]
+    public async Task Handle_ExpiredCertificate_ReportsExpired()
+    {
+        var db = await CreateDbAsync(UserA());
+        var id = await SeedRowAsync(db);
+        var certificate = await SeedSupportingDocumentAsync(db, "HALAL CERTIFICATE");
+        await SeedAttachmentAsync(db, id, certificate, expiryDate: new DateTime(2020, 1, 1));
+
+        var result = await new GetAllRawMaterialsHandler(db)
+            .Handle(new GetAllRawMaterialsQuery(), CancellationToken.None);
+
+        var info = Assert.Single(result.Data).HalalInformation;
+        Assert.NotNull(info);
+        Assert.Equal(HalalStatus.Expired, info.Status);
+        Assert.Equal(new DateOnly(2020, 1, 1), info.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task Handle_WithoutCertificate_OrWithAnotherType_LeavesTheColumnNull()
+    {
+        var db = await CreateDbAsync(UserA());
+        var bareId = await SeedRowAsync(db);
+        var otherTypeId = await SeedRowAsync(
+            db, ingredient: "Corn Flour", ingredientCode: "RM-002");
+        var processFlow = await SeedSupportingDocumentAsync(db, "PROCESS FLOW");
+        await SeedAttachmentAsync(
+            db, otherTypeId, processFlow, expiryDate: new DateTime(2020, 1, 1));
+
+        var result = await new GetAllRawMaterialsHandler(db)
+            .Handle(new GetAllRawMaterialsQuery(), CancellationToken.None);
+
+        // Only a HALAL CERTIFICATE row fills the column - a process flow that happens to be
+        // expired must not read as a halal problem, and a row with no uploads stays empty.
+        Assert.Null(result.Data.Single(row => row.Id == bareId).HalalInformation);
+        Assert.Null(result.Data.Single(row => row.Id == otherTypeId).HalalInformation);
     }
 }

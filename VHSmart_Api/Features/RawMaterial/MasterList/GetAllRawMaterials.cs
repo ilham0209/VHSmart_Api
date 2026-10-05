@@ -8,10 +8,9 @@ using VHSmart_Api.Shared.Models;
 namespace VHSmart_Api.Features.RawMaterial.MasterList;
 
 // Raw Material Master List (spec 10.2 "Show N entries" table): Ingredient Code, Ingredient,
-// Manufacturer Name, Accessible for, Ingredient Status and Packaging Raw Material. Two of the
-// spec columns are missing on purpose: Assessment Status belongs to the risk assessment (10.3,
-// on hold) and Halal Information is derived from the HALAL CERTIFICATE attachment (RM-03). The
-// Action column is client-side only.
+// Manufacturer Name, Accessible for, Halal Information, Ingredient Status and Packaging Raw
+// Material. One spec column is missing on purpose: Assessment Status belongs to the risk
+// assessment (10.3, on hold). The Action column is client-side only.
 // Visibility is the special filter of CodingRules 7.3 (owner OR listed in Accessible For OR
 // Switch Company = ALL), configured once on the entity - this handler just queries the set.
 public record GetAllRawMaterialsQuery : IRequest<DataGridResponse<GetAllRawMaterialsResponse>>
@@ -25,6 +24,7 @@ public record GetAllRawMaterialsResponse(
     string? Ingredient,
     string? ManufacturerName,
     IReadOnlyList<string> AccessibleFor,
+    RawMaterialHalalInfoResponse? HalalInformation,
     string? IngredientStatus,
     bool IsPackagingMaterial,
     DateTime? ModifiedDate);
@@ -43,7 +43,7 @@ public class GetAllRawMaterialsHandler(VHSmartDbContext db)
             ? nameof(RawMaterialEntity.Id)
             : request.Request.SortBy;
 
-        return await db.RawMaterials
+        var grid = await db.RawMaterials
             .AsNoTracking()
             .ApplySearch(
                 request.Request.SearchTerm,
@@ -67,6 +67,9 @@ public class GetAllRawMaterialsHandler(VHSmartDbContext db)
                         .Select(company => company.Name)
                         .FirstOrDefault() ?? string.Empty)
                     .ToList(),
+                // Filled after paging: the HALAL CERTIFICATE of each row of THIS page is
+                // derived data (spec 10.2), so it never takes part in the search or the sort.
+                null,
                 db.GeneralData
                     .Where(data => data.Id == row.IngredientStatusId)
                     .Select(data => data.Name)
@@ -74,5 +77,12 @@ public class GetAllRawMaterialsHandler(VHSmartDbContext db)
                 row.IsPackagingMaterial,
                 row.SysDateModified))
             .ToDataGridResponseAsync(request.Request, ct);
+
+        var halalInformation = await RawMaterialHalalInformation.LoadManyAsync(
+            db, [.. grid.Data.Select(row => row.Id)], ct);
+        grid.Data = [.. grid.Data.Select(
+            row => row with { HalalInformation = halalInformation.GetValueOrDefault(row.Id) })];
+
+        return grid;
     }
 }

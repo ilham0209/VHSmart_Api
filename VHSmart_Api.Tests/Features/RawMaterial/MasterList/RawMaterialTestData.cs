@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.RawMaterial.MasterList;
+using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
 using VHSmart_Api.Shared.Domain.RawMaterial;
@@ -58,6 +59,61 @@ internal static class RawMaterialTestData
             ManufacturerEmail = $"{Guid.NewGuid():N}@example.com"
         };
         db.ManufacturerSuppliers.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // A Supporting Document row (R-06): the per-company document types the section "Attachment
+    // Information" is driven by. For View defaults to Raw Material because that is the only
+    // view this screen reads.
+    public static async Task<Guid> SeedSupportingDocumentAsync(
+        TestableVHSmartDbContext db,
+        string documentType,
+        Guid? companyId = null,
+        SupportingDocumentForView forView = SupportingDocumentForView.RawMaterial,
+        int documentSequence = 1)
+    {
+        var row = new SupportingDocumentEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            ForView = forView,
+            DocumentType = documentType,
+            DocumentSequence = documentSequence
+        };
+        db.SupportingDocuments.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // An already-uploaded attachment: the list, the halal column and the download tests only
+    // need the stored metadata, so they skip the storage layer the upload handler uses.
+    public static async Task<Guid> SeedAttachmentAsync(
+        TestableVHSmartDbContext db,
+        Guid rawMaterialId,
+        Guid documentTypeId,
+        Guid? companyId = null,
+        DateTime? expiryDate = null,
+        string? referenceNo = null,
+        string? authority = null,
+        string fileName = "certificate.pdf")
+    {
+        var row = new RawMaterialAttachmentEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            RawMaterialId = rawMaterialId,
+            DocumentTypeId = documentTypeId,
+            ExpiryDate = expiryDate,
+            ReferenceNo = referenceNo,
+            Authority = authority,
+            Document = new StoredFile
+            {
+                FileName = fileName,
+                StorageKey = $"{Guid.NewGuid():N}",
+                ContentType = "application/pdf",
+                SizeBytes = 4
+            }
+        };
+        db.RawMaterialAttachments.Add(row);
         await db.SaveChangesAsync();
         return row.Id;
     }

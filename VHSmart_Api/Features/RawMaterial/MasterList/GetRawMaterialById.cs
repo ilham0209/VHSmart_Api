@@ -8,11 +8,11 @@ namespace VHSmart_Api.Features.RawMaterial.MasterList;
 
 // The view/edit form of one raw material (spec 10.2 "Manage Master Raw Material"): every field
 // of the form plus the manufacturer name the row carries and the "List of Company" table of the
-// Accessible For picker. Assessment Status and the Halal Information columns are NOT here - the
-// risk assessment (10.3) is on hold and the halal values are derived from the HALAL CERTIFICATE
-// attachment, which belongs to RM-03. The visibility filter (CodingRules 7.3) makes another
-// company's row answer 404 unless it was shared with the caller. Shared by Get / Create /
-// Update like ServiceProviderResponse is.
+// Accessible For picker. The halal values are NOT here: the list's Halal Information column and
+// the modal's section "Attachment Information" are served by the attachment features next to
+// this file (GET {id:guid}/attachments), and Assessment Status stays out with 10.3 on hold. The
+// visibility filter (CodingRules 7.3) makes another company's row answer 404 unless it was
+// shared with the caller. Shared by Get / Create / Update like ServiceProviderResponse is.
 public record GetRawMaterialByIdQuery(Guid Id) : IRequest<RawMaterialResponse>;
 
 public record RawMaterialAccessibleCompanyResponse(Guid CompanyId, string CompanyName);

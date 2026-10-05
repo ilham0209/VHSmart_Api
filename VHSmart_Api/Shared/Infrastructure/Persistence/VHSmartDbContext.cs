@@ -61,6 +61,9 @@ public class VHSmartDbContext(
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
 
+    public DbSet<RawMaterialAttachmentEntity> RawMaterialAttachments =>
+        Set<RawMaterialAttachmentEntity>();
+
     public DbSet<RawMaterialEntity> RawMaterials => Set<RawMaterialEntity>();
 
     public DbSet<RoleEntity> Roles => Set<RoleEntity>();
@@ -673,6 +676,48 @@ public class VHSmartDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.AccessibleCompanyId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RawMaterialAttachmentEntity>(entity =>
+        {
+            entity.ToTable("RawMaterialAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ExpiryDate).HasColumnType("date");
+            // Database.md 8 gives the row its own status column: written from the calculator
+            // when the file is stored, re-computed on every read (D-04) - a snapshot for
+            // reporting, never what a screen shows.
+            entity.Property(x => x.DocumentStatus).HasMaxLength(30);
+            entity.Property(x => x.ReferenceNo).HasMaxLength(100);
+            entity.Property(x => x.Authority).HasMaxLength(200);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // No unique index: Database.md 8 states no "one row per type" rule (the premise
+            // tab states one explicitly and gets an index), so the upload replaces the row it
+            // finds for the type and nothing constrains the table itself.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.RawMaterialId);
+            entity.HasOne(x => x.RawMaterial)
+                .WithMany()
+                .HasForeignKey(x => x.RawMaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.DocumentTypeId);
+            entity.HasOne(x => x.DocumentType)
+                .WithMany()
+                .HasForeignKey(x => x.DocumentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Required File group (Database.md 8 "_ File"): a row only exists once a file has
+            // been uploaded, exactly like the premise attachment.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
+            });
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

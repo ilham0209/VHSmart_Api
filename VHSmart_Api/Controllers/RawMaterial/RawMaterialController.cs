@@ -6,9 +6,10 @@ using VHSmart_Api.Shared.Infrastructure.Security;
 
 namespace VHSmart_Api.Controllers.RawMaterial;
 
-// Raw Material Master List (spec 10.2): list + form CRUD, the form's dropdown sources and the
-// toolbar's "Multiple Delete". [HasPermission] gates every action on the RawMaterial.MasterList
-// screen key (CodingRules 8.2); the handlers apply the special "Accessible For" visibility rule
+// Raw Material Master List (spec 10.2): list + form CRUD, the form's dropdown sources, the
+// toolbar's "Multiple Delete" and the modal's Attachment Information section (list / upload /
+// download). [HasPermission] gates every action on the RawMaterial.MasterList screen key
+// (CodingRules 8.2); the handlers apply the special "Accessible For" visibility rule
 // (CodingRules 7.3) and the ownership check.
 [ApiController]
 [Route("api/raw-material/master-list")]
@@ -32,6 +33,34 @@ public class RawMaterialController(ISender sender) : ControllerBase
     [HasPermission(PermissionKeys.RawMaterialMasterList, PermissionAction.View)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct) =>
         Ok(await sender.Send(new GetRawMaterialByIdQuery(id), ct));
+
+    // Section "Attachment Information" of the modal (spec 10.2): every Raw Material document
+    // type of the company in order, each with its upload or an N/A row; D-22 file rules (422).
+    [HttpGet("{id:guid}/attachments")]
+    [HasPermission(PermissionKeys.RawMaterialMasterList, PermissionAction.View)]
+    public async Task<IActionResult> GetAttachments(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(new GetRawMaterialAttachmentsQuery(id), ct));
+
+    [HttpPost("{id:guid}/attachments")]
+    [Consumes("multipart/form-data")]
+    [HasPermission(PermissionKeys.RawMaterialMasterList, PermissionAction.Create)]
+    public async Task<IActionResult> UploadAttachment(
+        Guid id,
+        [FromForm] UploadRawMaterialAttachmentCommand command,
+        CancellationToken ct) =>
+        Ok(await sender.Send(command with { RawMaterialId = id }, ct));
+
+    [HttpGet("{id:guid}/attachments/{attachmentId:guid}/document")]
+    [HasPermission(PermissionKeys.RawMaterialMasterList, PermissionAction.View)]
+    public async Task<IActionResult> GetAttachmentDocument(
+        Guid id,
+        Guid attachmentId,
+        CancellationToken ct)
+    {
+        var response = await sender.Send(
+            new GetRawMaterialAttachmentDocumentQuery(id, attachmentId), ct);
+        return File(response.Content, response.ContentType);
+    }
 
     [HttpPost]
     [HasPermission(PermissionKeys.RawMaterialMasterList, PermissionAction.Create)]

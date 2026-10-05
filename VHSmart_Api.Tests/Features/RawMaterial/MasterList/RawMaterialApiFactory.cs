@@ -32,6 +32,8 @@ internal sealed class RawMaterialApiFactory : WebApplicationFactory<Program>
     private readonly Guid _grantedRoleId;
     private readonly bool _grantPermissions;
     private readonly string _databaseName = $"VHSmartRawMaterialApiTests-{Guid.NewGuid():N}";
+    private readonly string _storageRoot = Path.Combine(
+        Path.GetTempPath(), "VHSmartRawMaterialApiTests", $"storage-{Guid.NewGuid():N}");
 
     public RawMaterialApiFactory(Guid grantedRoleId, bool grantPermissions = true)
     {
@@ -185,6 +187,27 @@ internal sealed class RawMaterialApiFactory : WebApplicationFactory<Program>
         return row.Id;
     }
 
+    // A Supporting Document row (R-06): one of the caller company's "Raw Material" document
+    // types, i.e. one line of the Attachment Information section.
+    public async Task<Guid> SeedSupportingDocumentAsync(
+        string documentType,
+        Guid? companyId = null,
+        int documentSequence = 1)
+    {
+        using var scope = Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VHSmartDbContext>();
+        var row = new SupportingDocumentEntity
+        {
+            CompanyId = companyId ?? CompanyId,
+            ForView = SupportingDocumentForView.RawMaterial,
+            DocumentType = documentType,
+            DocumentSequence = documentSequence
+        };
+        db.SupportingDocuments.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
     private static async Task<Guid> SeedCertificationBodyAsync(VHSmartDbContext db, string name)
     {
         var row = new CertificationBodyEntity
@@ -210,6 +233,7 @@ internal sealed class RawMaterialApiFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Jwt:SigningKey", TestSigningKey);
+        builder.UseSetting("FileStorage:RootPath", _storageRoot);
 
         builder.ConfigureTestServices(services =>
         {
@@ -225,5 +249,12 @@ internal sealed class RawMaterialApiFactory : WebApplicationFactory<Program>
 
             services.AddSingleton<IPermissionService>(new StubPermissionService(granted));
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing && Directory.Exists(_storageRoot))
+            Directory.Delete(_storageRoot, recursive: true);
     }
 }

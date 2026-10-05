@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using VHSmart_Api.Shared.Infrastructure.Persistence;
 namespace VHSmart_Api.Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(VHSmartDbContext))]
-    partial class VHSmartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261005012901_RawManufacturerSuppliers")]
+    partial class RawManufacturerSuppliers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5429,181 +5432,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("RawManufacturerSuppliers", (string)null);
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialAccessibleCompanyEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AccessibleCompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("RawMaterialId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccessibleCompanyId");
-
-                    b.HasIndex("RawMaterialId");
-
-                    b.ToTable("RawMaterialAccessibleCompanies", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialAttachmentEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Authority")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("DocumentStatus")
-                        .HasMaxLength(30)
-                        .HasColumnType("nvarchar(30)");
-
-                    b.Property<Guid>("DocumentTypeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime?>("ExpiryDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("RawMaterialId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ReferenceNo")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("DocumentTypeId");
-
-                    b.HasIndex("RawMaterialId");
-
-                    b.ToTable("RawMaterialAttachments", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<string>("CommercialName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Ingredient")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("IngredientCode")
-                        .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
-
-                    b.Property<Guid?>("IngredientSourceId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("IngredientStatusId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsPackagingMaterial")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("ManufacturerSupplierId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ScientificName")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("IngredientSourceId");
-
-                    b.HasIndex("IngredientStatusId");
-
-                    b.HasIndex("ManufacturerSupplierId");
-
-                    b.HasIndex("CompanyId", "IngredientCode")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0 AND [IngredientCode] IS NOT NULL");
-
-                    b.ToTable("RawMaterials", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CertificationBodyEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Admin.CountryEntity", null)
@@ -6475,114 +6303,9 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.Navigation("Logo");
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialAccessibleCompanyEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AccessibleCompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialEntity", null)
-                        .WithMany("AccessibleCompanies")
-                        .HasForeignKey("RawMaterialId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialAttachmentEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.SupportingDocumentEntity", "DocumentType")
-                        .WithMany()
-                        .HasForeignKey("DocumentTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialEntity", "RawMaterial")
-                        .WithMany()
-                        .HasForeignKey("RawMaterialId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Document", b1 =>
-                        {
-                            b1.Property<Guid>("RawMaterialAttachmentEntityId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.Property<string>("FileName")
-                                .IsRequired()
-                                .HasMaxLength(260)
-                                .HasColumnType("nvarchar(260)");
-
-                            b1.Property<long>("SizeBytes")
-                                .HasColumnType("bigint");
-
-                            b1.Property<string>("StorageKey")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.HasKey("RawMaterialAttachmentEntityId");
-
-                            b1.ToTable("RawMaterialAttachments");
-
-                            b1.WithOwner()
-                                .HasForeignKey("RawMaterialAttachmentEntityId");
-                        });
-
-                    b.Navigation("Document")
-                        .IsRequired();
-
-                    b.Navigation("DocumentType");
-
-                    b.Navigation("RawMaterial");
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("IngredientSourceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("IngredientStatusId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.RawMaterial.ManufacturerSupplierEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ManufacturerSupplierId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", b =>
                 {
                     b.Navigation("Brands");
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialEntity", b =>
-                {
-                    b.Navigation("AccessibleCompanies");
                 });
 #pragma warning restore 612, 618
         }

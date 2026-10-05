@@ -519,4 +519,102 @@ public class PremiseApiTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    // Bulk upload (spec 7.7 + 21.10): POST multipart "File", partial success body.
+    private static MultipartFormDataContent BulkForm(
+        byte[] bytes, string fileName = "premises.xlsx")
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new ByteArrayContent(bytes), "File", fileName);
+        return content;
+    }
+
+    [Fact]
+    public async Task BulkUpload_WithoutCreatePermission_ReturnsForbidden()
+    {
+        using var factory = new PremiseApiFactory(grantCreate: false);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadTestData.FactoryFile(
+            BulkUploadTestData.FactoryRow("bulk@premise.my")));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_WithoutFile_ReturnsBadRequest()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = new MultipartFormDataContent();
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_WrongExtension_ReturnsUnprocessableEntity()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(
+            BulkUploadTestData.FactoryFile(BulkUploadTestData.FactoryRow("x@premise.my")),
+            "premises.csv");
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_ValidFile_ReturnsSummary()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadTestData.FactoryFile(
+            BulkUploadTestData.FactoryRow("api1@premise.my"),
+            BulkUploadTestData.FactoryRow("api2@premise.my", name: "Second API Factory")));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+        var body = await response.Content
+            .ReadFromJsonAsync<BulkUploadPremisesResponse>(Json);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(2, body.TotalRows);
+        Assert.Equal(2, body.UploadedRows);
+        Assert.Empty(body.Errors);
+    }
+
+    [Fact]
+    public async Task BulkUpload_InvalidRows_ReturnsRowErrors()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        // FOR COMPANY must name the JWT's company; anything else fails the row (8.1).
+        using var form = BulkForm(BulkUploadTestData.FactoryFile(
+            BulkUploadTestData.FactoryRow("wrong@premise.my", company: "Other Co Sdn Bhd")));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+        var body = await response.Content
+            .ReadFromJsonAsync<BulkUploadPremisesResponse>(Json);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(1, body.TotalRows);
+        Assert.Equal(0, body.UploadedRows);
+        var error = Assert.Single(body.Errors);
+        Assert.Equal(5, error.RowNumber);
+        Assert.Equal("Company not found.", error.Message);
+    }
 }

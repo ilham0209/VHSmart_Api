@@ -38,6 +38,16 @@ public class PremiseController(ISender sender) : ControllerBase
         CancellationToken ct) =>
         Ok(await sender.Send(command, ct));
 
+    // Bulk upload (spec 7.7, 21.10): .xls/.xlsx, max 250 rows, partial success with the
+    // per-row error list.
+    [HttpPost("bulk-upload")]
+    [Consumes("multipart/form-data")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.Create)]
+    public async Task<IActionResult> BulkUpload(
+        [FromForm] BulkUploadPremisesCommand command,
+        CancellationToken ct) =>
+        Ok(await sender.Send(command, ct));
+
     [HttpGet("{id:guid}")]
     [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct) =>

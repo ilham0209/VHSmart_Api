@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
+using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
@@ -57,6 +58,8 @@ public class VHSmartDbContext(
     public DbSet<PremiseHostelEntity> PremiseHostels => Set<PremiseHostelEntity>();
 
     public DbSet<PremiseAttachmentEntity> PremiseAttachments => Set<PremiseAttachmentEntity>();
+
+    public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
@@ -718,6 +721,62 @@ public class VHSmartDbContext(
                 document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
                 document.Property(f => f.SizeBytes).IsRequired();
             });
+        });
+
+        modelBuilder.Entity<ProductEntity>(entity =>
+        {
+            entity.ToTable("PrdProducts");
+            entity.HasKey(x => x.Id);
+            // The nullable columns (Database.md 9 without "*") carry the spec form's optional
+            // fields at their documented lengths; Name / ManufacturerSupplierId are required
+            // by the 9.1 form and are enforced in the validators, not by the schema.
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Code).HasMaxLength(500);
+            entity.Property(x => x.Gtin).HasMaxLength(50);
+            entity.Property(x => x.NutritionContentClaims).HasMaxLength(500);
+            entity.Property(x => x.PotentialAllergens).HasMaxLength(500);
+            entity.Property(x => x.CalorieContent).HasMaxLength(100);
+            entity.Property(x => x.AvailableAt).HasMaxLength(200);
+            entity.Property(x => x.PackagingSize).HasMaxLength(100);
+            entity.Property(x => x.QrCodeKey).HasMaxLength(100);
+            entity.Property(x => x.VerifyHalalPublishStatus).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 9): CompanyId from the JWT, indexed because the global
+            // query filter runs on every list. Database.md 9 defines NO unique index - the
+            // legacy product-name check is [VERIFY] and was not copied.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ManufacturerSupplierId);
+            entity.HasOne<ManufacturerSupplierEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ManufacturerSupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Three FKs into AdmGeneralData (Brand / Product Category / Marketing Method) -
+            // wired without navigations like RawMaterials' two dropdown columns above.
+            entity.HasIndex(x => x.BrandId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.MarketingMethodId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.MarketingMethodId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

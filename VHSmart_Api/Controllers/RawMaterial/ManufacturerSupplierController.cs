@@ -41,6 +41,16 @@ public class ManufacturerSupplierController(ISender sender) : ControllerBase
         CancellationToken ct) =>
         Ok(await sender.Send(command, ct));
 
+    // Bulk upload (spec 10.1, 21.10): .xls/.xlsx, max 250 rows, partial success with the
+    // per-row error list.
+    [HttpPost("bulk-upload")]
+    [Consumes("multipart/form-data")]
+    [HasPermission(PermissionKeys.RawMaterialManufacturerSupplier, PermissionAction.Create)]
+    public async Task<IActionResult> BulkUpload(
+        [FromForm] BulkUploadManufacturerSuppliersCommand command,
+        CancellationToken ct) =>
+        Ok(await sender.Send(command, ct));
+
     // The logo belongs to an existing row, so it is an Edit of that row.
     [HttpPost("{id:guid}/logo")]
     [Consumes("multipart/form-data")]

@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VHSmart_Api.Features.RawMaterial.ManufacturerSupplier;
+using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Models;
@@ -350,5 +351,120 @@ public class ManufacturerSupplierApiTests
         var response = await client.GetAsync($"{Route}/{rowId}/logo");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    // The template's CATEGORY cell is the caller's own "Manufacturer Type" general data.
+    private static async Task SeedManufacturerTypeAsync(
+        ManufacturerSupplierApiFactory factory,
+        string name = "Food and Beverages")
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VHSmartDbContext>();
+        db.GeneralData.Add(new GeneralDataEntity
+        {
+            CompanyId = factory.CompanyId,
+            Group = GeneralDataGroup.COMPANY,
+            Category = "Manufacturer Type",
+            Name = name
+        });
+        await db.SaveChangesAsync();
+    }
+
+    // Bulk upload (spec 10.1, 21.10): POST multipart "File", partial success body.
+    private static MultipartFormDataContent BulkForm(
+        byte[] bytes, string fileName = "manufacturers.xlsx")
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new ByteArrayContent(bytes), "File", fileName);
+        return content;
+    }
+
+    [Fact]
+    public async Task BulkUpload_WithoutCreatePermission_ReturnsForbidden()
+    {
+        using var factory = new ManufacturerSupplierApiFactory(AdminRoleId, grantPermissions: false);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadManufacturerSupplierTestData.File(
+            BulkUploadManufacturerSupplierTestData.Row()));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_WithoutFile_ReturnsBadRequest()
+    {
+        using var factory = new ManufacturerSupplierApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = new MultipartFormDataContent();
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_WrongExtension_ReturnsUnprocessableEntity()
+    {
+        using var factory = new ManufacturerSupplierApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(
+            BulkUploadManufacturerSupplierTestData.File(
+                BulkUploadManufacturerSupplierTestData.Row()),
+            "manufacturers.csv");
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_ValidFile_ReturnsSummary()
+    {
+        using var factory = new ManufacturerSupplierApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await SeedManufacturerTypeAsync(factory);
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadManufacturerSupplierTestData.File(
+            BulkUploadManufacturerSupplierTestData.Row(),
+            BulkUploadManufacturerSupplierTestData.Row(
+                name: "Second Foods", email: "second@santan.example.com")));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+        var body = await response.Content
+            .ReadFromJsonAsync<BulkUploadManufacturerSuppliersResponse>(Json);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(2, body.TotalRows);
+        Assert.Equal(2, body.UploadedRows);
+        Assert.Empty(body.Errors);
+    }
+
+    [Fact]
+    public async Task BulkUpload_InvalidRows_ReturnsRowErrors()
+    {
+        using var factory = new ManufacturerSupplierApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await SeedManufacturerTypeAsync(factory);
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadManufacturerSupplierTestData.File(
+            BulkUploadManufacturerSupplierTestData.Row(country: "Atlantis")));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+        var body = await response.Content
+            .ReadFromJsonAsync<BulkUploadManufacturerSuppliersResponse>(Json);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(1, body.TotalRows);
+        Assert.Equal(0, body.UploadedRows);
+        var error = Assert.Single(body.Errors);
+        Assert.Equal(5, error.RowNumber);
+        Assert.Equal("Country not found.", error.Message);
     }
 }

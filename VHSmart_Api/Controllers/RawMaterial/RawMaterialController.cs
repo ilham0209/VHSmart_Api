@@ -69,6 +69,16 @@ public class RawMaterialController(ISender sender) : ControllerBase
         CancellationToken ct) =>
         Ok(await sender.Send(command, ct));
 
+    // Bulk upload (spec 10.2, 21.10): .xls/.xlsx, max 250 rows, partial success with the
+    // per-row error list.
+    [HttpPost("bulk-upload")]
+    [Consumes("multipart/form-data")]
+    [HasPermission(PermissionKeys.RawMaterialMasterList, PermissionAction.Create)]
+    public async Task<IActionResult> BulkUpload(
+        [FromForm] BulkUploadRawMaterialsCommand command,
+        CancellationToken ct) =>
+        Ok(await sender.Send(command, ct));
+
     [HttpPost("bulk-delete")]
     [HasPermission(PermissionKeys.RawMaterialMasterList, PermissionAction.Delete)]
     public async Task<IActionResult> BulkDelete(

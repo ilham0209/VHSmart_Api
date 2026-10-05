@@ -602,4 +602,103 @@ public class RawMaterialApiTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    // Bulk upload (spec 10.2, 21.10): POST multipart "File", partial success body.
+    private static MultipartFormDataContent BulkForm(
+        byte[] bytes, string fileName = "raw-materials.xlsx")
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new ByteArrayContent(bytes), "File", fileName);
+        return content;
+    }
+
+    [Fact]
+    public async Task BulkUpload_WithoutCreatePermission_ReturnsForbidden()
+    {
+        using var factory = new RawMaterialApiFactory(AdminRoleId, grantPermissions: false);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadRawMaterialTestData.File(
+            BulkUploadRawMaterialTestData.Row()));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_WithoutFile_ReturnsBadRequest()
+    {
+        using var factory = new RawMaterialApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = new MultipartFormDataContent();
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_WrongExtension_ReturnsUnprocessableEntity()
+    {
+        using var factory = new RawMaterialApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(
+            BulkUploadRawMaterialTestData.File(BulkUploadRawMaterialTestData.Row()),
+            "raw-materials.csv");
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task BulkUpload_ValidFile_ReturnsSummary()
+    {
+        using var factory = new RawMaterialApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedGeneralDataAsync("Ingredient Status", "Active");
+        await factory.SeedGeneralDataAsync("Ingredient Source", "Plant Based");
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadRawMaterialTestData.File(
+            BulkUploadRawMaterialTestData.Row(),
+            BulkUploadRawMaterialTestData.Row(
+                ingredient: "Kacang Hijau", code: "BA-002")));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+        var body = await response.Content
+            .ReadFromJsonAsync<BulkUploadRawMaterialsResponse>(Json);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(2, body.TotalRows);
+        Assert.Equal(2, body.UploadedRows);
+        Assert.Empty(body.Errors);
+    }
+
+    [Fact]
+    public async Task BulkUpload_InvalidRows_ReturnsRowErrors()
+    {
+        using var factory = new RawMaterialApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedGeneralDataAsync("Ingredient Status", "Active");
+        await factory.SeedGeneralDataAsync("Ingredient Source", "Plant Based");
+        using var client = CreateAuthorizedClient(factory);
+
+        using var form = BulkForm(BulkUploadRawMaterialTestData.File(
+            BulkUploadRawMaterialTestData.Row(status: "Bogus")));
+        var response = await client.PostAsync($"{Route}/bulk-upload", form);
+        var body = await response.Content
+            .ReadFromJsonAsync<BulkUploadRawMaterialsResponse>(Json);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(body);
+        Assert.Equal(1, body.TotalRows);
+        Assert.Equal(0, body.UploadedRows);
+        var error = Assert.Single(body.Errors);
+        Assert.Equal(5, error.RowNumber);
+        Assert.Equal("Ingredient status not found.", error.Message);
+    }
 }

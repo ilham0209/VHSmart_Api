@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.Product.ManageProduct;
+using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
+using VHSmart_Api.Shared.Domain.Companies;
 using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 
@@ -83,6 +85,7 @@ internal static class ProductTestData
             Type = ManufacturerSupplierType.Both,
             ManufacturerName = name,
             ManufacturerAddress = "Jalan Gombak 1",
+            ManufacturerContactNo = "0312345678",
             ManufacturerEmail = $"{Guid.NewGuid():N}@example.com"
         };
         db.ManufacturerSuppliers.Add(row);
@@ -130,6 +133,120 @@ internal static class ProductTestData
             Code = code
         };
         db.Products.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // The ComCompanyBrands link of spec 6.3 (D-20). The Ingredient Information tab refuses to
+    // answer without at least one of these - the General Data brand row alone is NOT enough.
+    public static async Task<Guid> SeedCompanyBrandAsync(
+        TestableVHSmartDbContext db,
+        Guid? companyId = null,
+        string name = "Sereni")
+    {
+        var row = new CompanyBrandEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            BrandId = await SeedBrandAsync(db, name, companyId)
+        };
+        db.CompanyBrands.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // A raw material the caller can see under the 7.3 filter, with the two PRODUCT dropdown
+    // rows and a manufacturer the RM-02 form requires. The ingredient code is unique per
+    // company (D-17), so it is generated rather than fixed.
+    public static async Task<Guid> SeedRawMaterialAsync(
+        TestableVHSmartDbContext db,
+        string ingredient = "Rice Flour",
+        Guid? companyId = null,
+        Guid? manufacturerId = null,
+        Guid[]? accessibleCompanyIds = null)
+    {
+        var row = new RawMaterialEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            Category = RawMaterialCategory.Core,
+            IngredientStatusId = await SeedGeneralDataAsync(
+                db, GeneralDataGroup.PRODUCT, "Ingredient Status", "Active", companyId),
+            Ingredient = ingredient,
+            IngredientCode = $"RM-{Guid.NewGuid():N}",
+            IngredientSourceId = await SeedGeneralDataAsync(
+                db, GeneralDataGroup.PRODUCT, "Ingredient Source", "Plant Based", companyId),
+            ManufacturerSupplierId = manufacturerId ?? await SeedManufacturerAsync(db, companyId),
+            IsPackagingMaterial = false
+        };
+        db.RawMaterials.Add(row);
+
+        foreach (var accessibleCompanyId in accessibleCompanyIds ?? [])
+            db.RawMaterialAccessibleCompanies.Add(new RawMaterialAccessibleCompanyEntity
+            {
+                RawMaterialId = row.Id,
+                AccessibleCompanyId = accessibleCompanyId
+            });
+
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // A row of the tab table (Database.md 9). Nothing soft-deletes these: unlinking flips the
+    // status, so a test seeds the status it wants to read.
+    public static async Task<Guid> SeedIngredientAsync(
+        TestableVHSmartDbContext db,
+        Guid productId,
+        Guid rawMaterialId,
+        string mappingStatus = ProductIngredientMappingStatus.Active,
+        Guid? companyId = null)
+    {
+        var row = new ProductIngredientEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            ProductId = productId,
+            RawMaterialId = rawMaterialId,
+            MappingStatus = mappingStatus
+        };
+        db.ProductIngredients.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // The per-company "HALAL CERTIFICATE" Supporting Document (R-06) plus one upload for the
+    // material - the pair the ingredient tab's certificate column and D-18 read.
+    public static async Task<Guid> SeedHalalCertificateAsync(
+        TestableVHSmartDbContext db,
+        Guid rawMaterialId,
+        DateTime? expiryDate = null,
+        string referenceNo = "JAKIM/1/2026/0001",
+        string authority = "JAKIM",
+        Guid? companyId = null)
+    {
+        var documentType = new SupportingDocumentEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            ForView = SupportingDocumentForView.RawMaterial,
+            DocumentType = "HALAL CERTIFICATE",
+            DocumentSequence = 1
+        };
+        db.SupportingDocuments.Add(documentType);
+
+        var row = new RawMaterialAttachmentEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            RawMaterialId = rawMaterialId,
+            DocumentTypeId = documentType.Id,
+            ExpiryDate = expiryDate,
+            ReferenceNo = referenceNo,
+            Authority = authority,
+            Document = new StoredFile
+            {
+                FileName = "certificate.pdf",
+                StorageKey = $"{Guid.NewGuid():N}",
+                ContentType = "application/pdf",
+                SizeBytes = 4
+            }
+        };
+        db.RawMaterialAttachments.Add(row);
         await db.SaveChangesAsync();
         return row.Id;
     }

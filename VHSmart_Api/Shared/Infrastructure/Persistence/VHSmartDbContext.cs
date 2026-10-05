@@ -59,6 +59,8 @@ public class VHSmartDbContext(
 
     public DbSet<PremiseAttachmentEntity> PremiseAttachments => Set<PremiseAttachmentEntity>();
 
+    public DbSet<ProductIngredientEntity> ProductIngredients => Set<ProductIngredientEntity>();
+
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
@@ -777,6 +779,38 @@ public class VHSmartDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.MarketingMethodId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductIngredientEntity>(entity =>
+        {
+            entity.ToTable("PrdProductIngredients");
+            entity.HasKey(x => x.Id);
+            // The link/unlink toggle of spec 9.1 (Database.md 9): a 20-char status string, not
+            // a delete - see ProductIngredientMappingStatus.
+            entity.Property(x => x.MappingStatus).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.RawMaterialId);
+            entity.HasOne<RawMaterialEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RawMaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (ProductId, RawMaterialId) among live rows (Database.md 9): unlinking keeps the
+            // row and flips its status, so the pair can never appear twice - the handlers answer
+            // the friendly message instead of letting this fire.
+            entity.HasIndex(x => new { x.ProductId, x.RawMaterialId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.Product.ManageProduct;
+using VHSmart_Api.Shared.Domain.Calculators;
+using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Models;
 using static VHSmart_Api.Tests.Features.Product.ManageProduct.ProductTestData;
 
@@ -153,6 +155,126 @@ public class GetAllProductsTests
         Assert.False(await db.Products.IgnoreQueryFilters()
             .AnyAsync(row => row.Id == id && !row.IsDeleted));
     }
+
+    // The three derived columns (spec 9.1, D-18): computed per page, never stored.
+    [Fact]
+    public async Task Handle_DerivedColumns_NoIngredient_AnswersUnlinkedExpiredNull()
+    {
+        var db = await CreateDbAsync(UserA());
+        await SeedRowAsync(db);
+
+        var row = Assert.Single((await QueryAsync(db)).Data);
+
+        Assert.Equal(ProductIngredientLinkStatus.Unlinked, row.IngredientLinkStatus);
+        Assert.Equal(HalalStatus.Expired, row.HalalStatus);
+        Assert.Null(row.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task Handle_DerivedColumns_ValidCertificate_AnswersLinkedValidAndItsExpiry()
+    {
+        var db = await CreateDbAsync(UserA());
+        var productId = await SeedRowAsync(db);
+        var rawMaterialId = await SeedRawMaterialAsync(db, "Rice Flour");
+        await SeedHalalCertificateAsync(db, rawMaterialId, new DateTime(2030, 6, 30));
+        await SeedIngredientAsync(db, productId, rawMaterialId);
+
+        var row = Assert.Single((await QueryAsync(db)).Data);
+
+        Assert.Equal(ProductIngredientLinkStatus.Linked, row.IngredientLinkStatus);
+        Assert.Equal(HalalStatus.Valid, row.HalalStatus);
+        Assert.Equal(new DateOnly(2030, 6, 30), row.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task Handle_DerivedColumns_ExpiredCertificate_AnswersExpired()
+    {
+        var db = await CreateDbAsync(UserA());
+        var productId = await SeedRowAsync(db);
+        var rawMaterialId = await SeedRawMaterialAsync(db);
+        await SeedHalalCertificateAsync(db, rawMaterialId, new DateTime(2020, 1, 1));
+        await SeedIngredientAsync(db, productId, rawMaterialId);
+
+        var row = Assert.Single((await QueryAsync(db)).Data);
+
+        Assert.Equal(ProductIngredientLinkStatus.Linked, row.IngredientLinkStatus);
+        Assert.Equal(HalalStatus.Expired, row.HalalStatus);
+        Assert.Equal(new DateOnly(2020, 1, 1), row.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task Handle_DerivedColumns_MissingCertificate_AnswersExpiredWithoutDate()
+    {
+        var db = await CreateDbAsync(UserA());
+        var productId = await SeedRowAsync(db);
+        await SeedIngredientAsync(db, productId, await SeedRawMaterialAsync(db));
+
+        var row = Assert.Single((await QueryAsync(db)).Data);
+
+        Assert.Equal(ProductIngredientLinkStatus.Linked, row.IngredientLinkStatus);
+        Assert.Equal(HalalStatus.Expired, row.HalalStatus);
+        Assert.Null(row.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task Handle_DerivedColumns_TwoMaterials_TakeTheEarliestExpiry()
+    {
+        // D-18: product expiry = the earliest expiry among its linked raw materials, and one
+        // expired certificate makes the whole product Expired.
+        var db = await CreateDbAsync(UserA());
+        var productId = await SeedRowAsync(db);
+        var first = await SeedRawMaterialAsync(db, "Rice Flour");
+        var second = await SeedRawMaterialAsync(db, "Cane Sugar");
+        await SeedHalalCertificateAsync(db, first, new DateTime(2031, 1, 1));
+        await SeedHalalCertificateAsync(db, second, new DateTime(2027, 3, 15));
+        await SeedIngredientAsync(db, productId, first);
+        await SeedIngredientAsync(db, productId, second);
+
+        var row = Assert.Single((await QueryAsync(db)).Data);
+
+        Assert.Equal(ProductIngredientLinkStatus.Linked, row.IngredientLinkStatus);
+        Assert.Equal(HalalStatus.Valid, row.HalalStatus);
+        Assert.Equal(new DateOnly(2027, 3, 15), row.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task Handle_DerivedColumns_UnlinkedRow_IsNotCounted()
+    {
+        var db = await CreateDbAsync(UserA());
+        var productId = await SeedRowAsync(db);
+        var rawMaterialId = await SeedRawMaterialAsync(db);
+        await SeedHalalCertificateAsync(db, rawMaterialId, new DateTime(2030, 6, 30));
+        await SeedIngredientAsync(
+            db, productId, rawMaterialId, ProductIngredientMappingStatus.Inactive);
+
+        var row = Assert.Single((await QueryAsync(db)).Data);
+
+        Assert.Equal(ProductIngredientLinkStatus.Unlinked, row.IngredientLinkStatus);
+        Assert.Equal(HalalStatus.Expired, row.HalalStatus);
+        Assert.Null(row.ExpiryDate);
+    }
+
+    [Fact]
+    public async Task Handle_DerivedColumns_NeverTakePartInTheSearch()
+    {
+        // Stance of the raw material list: the derived value is painted on after paging, so
+        // the Search box (name / code / GTIN) cannot find a product by its status.
+        var db = await CreateDbAsync(UserA());
+        var productId = await SeedRowAsync(db);
+        var rawMaterialId = await SeedRawMaterialAsync(db);
+        await SeedIngredientAsync(db, productId, rawMaterialId);
+
+        var result = await new GetAllProductsHandler(db, UserA()).Handle(
+            new GetAllProductsQuery { Request = new DataGridRequest { SearchTerm = "Linked" } },
+            CancellationToken.None);
+
+        Assert.Equal(0, result.TotalRecords);
+    }
+
+    private static Task<DataGridResponse<GetAllProductsResponse>> QueryAsync(
+        TestableVHSmartDbContext db) =>
+        new GetAllProductsHandler(db, UserA())
+            .Handle(new GetAllProductsQuery(), CancellationToken.None);
 
     // One seeding path for this file: the default fixture row with the overrides each test
     // needs (ProductTestData seeds the dropdown rows on demand).

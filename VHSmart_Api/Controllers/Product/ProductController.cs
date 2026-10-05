@@ -39,6 +39,54 @@ public class ProductController(ISender sender) : ControllerBase
         CancellationToken ct) =>
         Ok(await sender.Send(command, ct));
 
+    // Tab "Manage Ingredient Information" (spec 9.1): the table, its "+ Add New Ingredient"
+    // source, the link/unlink halves of the Action icon and the certificate download. Every
+    // action carries the >= 1 brand rule of spec 6.3 / 9.1 (422) - the handlers enforce it.
+    [HttpGet("{id:guid}/ingredients")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.View)]
+    public async Task<IActionResult> GetIngredients(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(new GetProductIngredientsQuery(id), ct));
+
+    // Literal segment after {id:guid} so it never binds as an ingredient id.
+    [HttpGet("{id:guid}/ingredients/options")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.View)]
+    public async Task<IActionResult> GetIngredientOptions(
+        Guid id,
+        [FromQuery] GetProductIngredientOptionsQuery query,
+        CancellationToken ct) =>
+        Ok(await sender.Send(query with { ProductId = id }, ct));
+
+    [HttpPost("{id:guid}/ingredients")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.Create)]
+    public async Task<IActionResult> LinkIngredient(
+        Guid id,
+        LinkProductIngredientCommand command,
+        CancellationToken ct) =>
+        Ok(await sender.Send(command with { ProductId = id }, ct));
+
+    [HttpDelete("{id:guid}/ingredients/{ingredientId:guid}")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.Delete)]
+    public async Task<IActionResult> UnlinkIngredient(
+        Guid id,
+        Guid ingredientId,
+        CancellationToken ct)
+    {
+        await sender.Send(new UnlinkProductIngredientCommand(id, ingredientId), ct);
+        return NoContent();
+    }
+
+    [HttpGet("{id:guid}/ingredients/{ingredientId:guid}/certificate")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.View)]
+    public async Task<IActionResult> GetIngredientCertificate(
+        Guid id,
+        Guid ingredientId,
+        CancellationToken ct)
+    {
+        var response = await sender.Send(
+            new GetProductIngredientCertificateQuery(id, ingredientId), ct);
+        return File(response.Content, response.ContentType);
+    }
+
     [HttpPut("{id:guid}")]
     [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.Edit)]
     public async Task<IActionResult> Update(

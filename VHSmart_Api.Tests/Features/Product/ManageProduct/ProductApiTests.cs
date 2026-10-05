@@ -6,6 +6,7 @@ using System.Text.Json.Serialization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VHSmart_Api.Features.Product.ManageProduct;
+using VHSmart_Api.Shared.Domain.Calculators;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Models;
 
@@ -284,5 +285,198 @@ public class ProductApiTests
             Json);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // The Manage Ingredient Information tab (spec 9.1) over HTTP: its routes, the brand rule
+    // and the link / unlink halves of the Action icon.
+    [Fact]
+    public async Task GetIngredients_WithoutViewPermission_ReturnsForbidden()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId, grantPermissions: false);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{productId}/ingredients");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetIngredients_CompanyWithoutBrandLink_ReturnsUnprocessableEntity()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{productId}/ingredients");
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetIngredients_WithBrand_ReturnsTheLinkedRow()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyBrandAsync();
+        var productId = await factory.SeedRowAsync();
+        var rawMaterialId = await factory.SeedRawMaterialAsync("Rice Flour");
+        await factory.SeedHalalCertificateAsync(rawMaterialId, new DateTime(2030, 6, 30));
+        await factory.SeedIngredientAsync(productId, rawMaterialId);
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{productId}/ingredients");
+        var payload = await ReadAsync<List<ProductIngredientResponse>>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        var row = Assert.Single(payload);
+        Assert.Equal("Rice Flour", row.Ingredient);
+        Assert.Equal("ACTIVE", row.MappingStatus);
+        Assert.Equal(HalalStatus.Valid, row.HalalCertificateInformation.Status);
+    }
+
+    [Fact]
+    public async Task GetIngredients_UnknownProduct_ReturnsNotFound()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyBrandAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{Guid.NewGuid()}/ingredients");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetIngredientOptions_ExcludesTheAlreadyLinkedMaterial()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyBrandAsync();
+        var productId = await factory.SeedRowAsync();
+        var linkedId = await factory.SeedRawMaterialAsync("Rice Flour");
+        await factory.SeedIngredientAsync(productId, linkedId);
+        await factory.SeedRawMaterialAsync("Cane Sugar");
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{productId}/ingredients/options");
+        var payload = await ReadAsync<DataGridResponse<ProductIngredientOptionResponse>>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("Cane Sugar", Assert.Single(payload.Data).Ingredient);
+    }
+
+    [Fact]
+    public async Task LinkIngredient_WithoutCreatePermission_ReturnsForbidden()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId, grantPermissions: false);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        var rawMaterialId = await factory.SeedRawMaterialAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsJsonAsync(
+            $"{Route}/{productId}/ingredients",
+            new LinkProductIngredientCommand(productId, rawMaterialId),
+            Json);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LinkIngredient_MissingRawMaterial_ReturnsBadRequest()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyBrandAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsJsonAsync(
+            $"{Route}/{productId}/ingredients",
+            new LinkProductIngredientCommand(productId, null),
+            Json);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task LinkAndUnlink_ToggleTheMappingStatusOverOneRow()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyBrandAsync();
+        var productId = await factory.SeedRowAsync();
+        var rawMaterialId = await factory.SeedRawMaterialAsync("Rice Flour");
+        using var client = CreateAuthorizedClient(factory);
+
+        var linked = await client.PostAsJsonAsync(
+            $"{Route}/{productId}/ingredients",
+            new LinkProductIngredientCommand(productId, rawMaterialId),
+            Json);
+        var linkedPayload = await ReadAsync<ProductIngredientResponse>(linked);
+
+        Assert.Equal(HttpStatusCode.OK, linked.StatusCode);
+        Assert.NotNull(linkedPayload);
+        Assert.Equal("ACTIVE", linkedPayload.MappingStatus);
+        Assert.Equal("Rice Flour", linkedPayload.Ingredient);
+
+        var unlinked = await client.DeleteAsync(
+            $"{Route}/{productId}/ingredients/{linkedPayload.Id}");
+
+        Assert.Equal(HttpStatusCode.NoContent, unlinked.StatusCode);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<VHSmartDbContext>();
+        var stored = await db.ProductIngredients.IgnoreQueryFilters().SingleAsync();
+        Assert.False(stored.IsDeleted);
+        Assert.Equal("INACTIVE", stored.MappingStatus);
+
+        var list = await client.GetAsync($"{Route}/{productId}/ingredients");
+        var rows = await ReadAsync<List<ProductIngredientResponse>>(list);
+        Assert.NotNull(rows);
+        Assert.Equal("INACTIVE", Assert.Single(rows).MappingStatus);
+    }
+
+    [Fact]
+    public async Task GetIngredientCertificate_WithoutCertificate_ReturnsNotFound()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyBrandAsync();
+        var productId = await factory.SeedRowAsync();
+        var ingredientId = await factory.SeedIngredientAsync(
+            productId, await factory.SeedRawMaterialAsync());
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync(
+            $"{Route}/{productId}/ingredients/{ingredientId}/certificate");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetIngredientCertificate_WithCertificate_ReturnsTheFile()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyBrandAsync();
+        var productId = await factory.SeedRowAsync();
+        var rawMaterialId = await factory.SeedRawMaterialAsync("Rice Flour");
+        await factory.SeedHalalCertificateAsync(rawMaterialId, new DateTime(2030, 6, 30));
+        var ingredientId = await factory.SeedIngredientAsync(productId, rawMaterialId);
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync(
+            $"{Route}/{productId}/ingredients/{ingredientId}/certificate");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync());
     }
 }

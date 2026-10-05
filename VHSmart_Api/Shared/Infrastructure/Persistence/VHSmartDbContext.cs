@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
+using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
 namespace VHSmart_Api.Shared.Infrastructure.Persistence;
@@ -40,6 +41,8 @@ public class VHSmartDbContext(
     public DbSet<GeneralDataEntity> GeneralData => Set<GeneralDataEntity>();
 
     public DbSet<HalalPolicyEntity> HalalPolicies => Set<HalalPolicyEntity>();
+
+    public DbSet<ManufacturerSupplierEntity> ManufacturerSuppliers => Set<ManufacturerSupplierEntity>();
 
     public DbSet<MinutesMeetingEntity> MinutesMeetings => Set<MinutesMeetingEntity>();
 
@@ -540,6 +543,69 @@ public class VHSmartDbContext(
             entity.HasIndex(x => new { x.CompanyId, x.Group, x.Category, x.Name })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<ManufacturerSupplierEntity>(entity =>
+        {
+            entity.ToTable("RawManufacturerSuppliers");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its spec string (CodingRules 11), e.g. "Both".
+            entity.Property(x => x.Type).IsRequired().HasMaxLength(20).HasConversion<string>();
+            // Every half column is nullable: which half is filled depends on Type, so the
+            // part that does not apply stays null and the list shows "N/A" (spec 10.1).
+            entity.Property(x => x.ManufacturerName).HasMaxLength(200);
+            entity.Property(x => x.ManufacturerBusinessRegNo).HasMaxLength(50);
+            entity.Property(x => x.ManufacturerAddress).HasMaxLength(500);
+            entity.Property(x => x.ManufacturerPersonInCharge).HasMaxLength(200);
+            entity.Property(x => x.ManufacturerContactNo).HasMaxLength(30);
+            entity.Property(x => x.ManufacturerEmail).HasMaxLength(254);
+            entity.Property(x => x.ManufacturerWebpage).HasMaxLength(200);
+            entity.Property(x => x.SupplierName).HasMaxLength(200);
+            entity.Property(x => x.SupplierAddress).HasMaxLength(500);
+            entity.Property(x => x.SupplierPersonInCharge).HasMaxLength(200);
+            entity.Property(x => x.SupplierContactNo).HasMaxLength(30);
+            entity.Property(x => x.SupplierEmail).HasMaxLength(254);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 8): CompanyId from the JWT, indexed because the global
+            // query filter runs on every list.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CountryEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ManufacturerCountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CountryEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SupplierCountryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // AdmGeneralData (COMPANY / Manufacturer Type) - wired now that the table exists.
+            entity.HasIndex(x => x.ManufacturerTypeId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ManufacturerTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, ManufacturerEmail) and (CompanyId, SupplierEmail) among live rows
+            // and only where the column is set (Database.md 8, spec 21.9): a manufacturer-only
+            // row has no supplier e-mail, and a soft delete frees the address for reuse. The
+            // handlers return the friendly message instead of letting these fire.
+            entity.HasIndex(x => new { x.CompanyId, x.ManufacturerEmail })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0 AND [ManufacturerEmail] IS NOT NULL");
+            entity.HasIndex(x => new { x.CompanyId, x.SupplierEmail })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0 AND [SupplierEmail] IS NOT NULL");
+            // Logo File? is optional (Database.md 8): nullable owned columns, exactly like
+            // AdmCertificationBodies.Logo; the bytes live in IFileStorage (F-06).
+            entity.OwnsOne(x => x.Logo, logo =>
+            {
+                logo.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                logo.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                logo.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

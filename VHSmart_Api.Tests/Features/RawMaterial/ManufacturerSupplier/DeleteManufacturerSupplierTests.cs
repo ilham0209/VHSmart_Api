@@ -1,0 +1,96 @@
+using Microsoft.EntityFrameworkCore;
+using VHSmart_Api.Features.RawMaterial.ManufacturerSupplier;
+using VHSmart_Api.Shared.Domain.RawMaterial;
+using VHSmart_Api.Shared.Exceptions;
+
+namespace VHSmart_Api.Tests.Features.RawMaterial.ManufacturerSupplier;
+
+public class DeleteManufacturerSupplierTests
+{
+    private static readonly Guid CompanyA = Guid.NewGuid();
+
+    private static readonly Guid CompanyB = Guid.NewGuid();
+
+    private static async Task<TestableVHSmartDbContext> CreateDbAsync(TestCurrentUser user)
+    {
+        var db = TestDbFactory.Create(TestDbFactory.NewDatabaseName(), user);
+        await db.Database.EnsureCreatedAsync();
+        return db;
+    }
+
+    private static ManufacturerSupplierEntity NewRow(Guid companyId, string email) =>
+        new()
+        {
+            CompanyId = companyId,
+            Type = ManufacturerSupplierType.ManufacturerOnly,
+            ManufacturerName = "Santan Foods",
+            ManufacturerAddress = "Jalan Gombak 1",
+            ManufacturerEmail = email
+        };
+
+    [Fact]
+    public async Task Handle_ExistingRow_SoftDeletesAndFreesTheEmail()
+    {
+        var db = await CreateDbAsync(new TestCurrentUser(Guid.NewGuid().ToString(), CompanyA));
+        var row = NewRow(CompanyA, "manufacturer@example.com");
+        db.ManufacturerSuppliers.Add(row);
+        await db.SaveChangesAsync();
+
+        await new DeleteManufacturerSupplierHandler(db)
+            .Handle(new DeleteManufacturerSupplierCommand(row.Id), CancellationToken.None);
+
+        // CodingRules 7.1: the row stays, the flag flips; the global filter hides it.
+        var stored = await db.ManufacturerSuppliers
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .SingleAsync();
+        Assert.True(stored.IsDeleted);
+        Assert.Empty(await db.ManufacturerSuppliers.ToArrayAsync());
+
+        // The e-mail is free again for a new live row (spec 21.9).
+        Assert.False(await db.ManufacturerSuppliers.AnyAsync(
+            maker => maker.ManufacturerEmail == "manufacturer@example.com"));
+    }
+
+    [Fact]
+    public async Task Handle_UnknownId_ThrowsNotFound()
+    {
+        var db = await CreateDbAsync(new TestCurrentUser(Guid.NewGuid().ToString(), CompanyA));
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            new DeleteManufacturerSupplierHandler(db)
+                .Handle(new DeleteManufacturerSupplierCommand(Guid.NewGuid()), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_CrossCompanyRow_ThrowsNotFound()
+    {
+        var databaseName = TestDbFactory.NewDatabaseName();
+        var db = TestDbFactory.Create(
+            databaseName, new TestCurrentUser(Guid.NewGuid().ToString(), CompanyA));
+        await db.Database.EnsureCreatedAsync();
+        var foreignRow = NewRow(CompanyB, "b@example.com");
+        db.ManufacturerSuppliers.Add(foreignRow);
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            new DeleteManufacturerSupplierHandler(db)
+                .Handle(new DeleteManufacturerSupplierCommand(foreignRow.Id), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task Handle_AlreadyDeletedRow_ThrowsNotFound()
+    {
+        var db = await CreateDbAsync(new TestCurrentUser(Guid.NewGuid().ToString(), CompanyA));
+        var row = NewRow(CompanyA, "manufacturer@example.com");
+        db.ManufacturerSuppliers.Add(row);
+        await db.SaveChangesAsync();
+
+        await new DeleteManufacturerSupplierHandler(db)
+            .Handle(new DeleteManufacturerSupplierCommand(row.Id), CancellationToken.None);
+
+        await Assert.ThrowsAsync<NotFoundException>(() =>
+            new DeleteManufacturerSupplierHandler(db)
+                .Handle(new DeleteManufacturerSupplierCommand(row.Id), CancellationToken.None));
+    }
+}

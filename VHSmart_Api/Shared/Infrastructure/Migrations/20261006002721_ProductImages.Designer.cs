@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using VHSmart_Api.Shared.Infrastructure.Persistence;
 namespace VHSmart_Api.Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(VHSmartDbContext))]
-    partial class VHSmartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261006002721_ProductImages")]
+    partial class ProductImages
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5319,155 +5322,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("ComTrainingModules", (string)null);
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuAccessibleCompanyEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AccessibleCompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("MenuId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccessibleCompanyId");
-
-                    b.HasIndex("MenuId");
-
-                    b.ToTable("PrdMenuAccessibleCompanies", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CategoryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<DateTime?>("EndDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime?>("StartDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CategoryId");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CompanyId", "CategoryId", "Name")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("PrdMenus", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuRawMaterialEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("MenuId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("RawMaterialId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("MenuId");
-
-                    b.HasIndex("RawMaterialId");
-
-                    b.HasIndex("MenuId", "RawMaterialId")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("PrdMenuRawMaterials", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.ProductEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -6774,57 +6628,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.Navigation("Training");
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuAccessibleCompanyEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AccessibleCompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Product.MenuEntity", null)
-                        .WithMany("AccessibleCompanies")
-                        .HasForeignKey("MenuId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuRawMaterialEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Product.MenuEntity", null)
-                        .WithMany("RawMaterials")
-                        .HasForeignKey("MenuId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialEntity", null)
-                        .WithMany()
-                        .HasForeignKey("RawMaterialId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.ProductEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
@@ -7092,13 +6895,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", b =>
                 {
                     b.Navigation("Brands");
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuEntity", b =>
-                {
-                    b.Navigation("AccessibleCompanies");
-
-                    b.Navigation("RawMaterials");
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.RawMaterial.RawMaterialEntity", b =>

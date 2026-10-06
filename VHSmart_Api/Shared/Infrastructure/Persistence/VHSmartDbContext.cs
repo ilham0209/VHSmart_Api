@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
+using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
@@ -57,6 +58,19 @@ public class VHSmartDbContext(
     public DbSet<PremiseHostelEntity> PremiseHostels => Set<PremiseHostelEntity>();
 
     public DbSet<PremiseAttachmentEntity> PremiseAttachments => Set<PremiseAttachmentEntity>();
+
+    public DbSet<MenuAccessibleCompanyEntity> MenuAccessibleCompanies =>
+        Set<MenuAccessibleCompanyEntity>();
+
+    public DbSet<MenuRawMaterialEntity> MenuRawMaterials => Set<MenuRawMaterialEntity>();
+
+    public DbSet<MenuEntity> Menus => Set<MenuEntity>();
+
+    public DbSet<ProductImageEntity> ProductImages => Set<ProductImageEntity>();
+
+    public DbSet<ProductIngredientEntity> ProductIngredients => Set<ProductIngredientEntity>();
+
+    public DbSet<ProductEntity> Products => Set<ProductEntity>();
 
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
@@ -720,6 +734,214 @@ public class VHSmartDbContext(
             });
         });
 
+        modelBuilder.Entity<MenuEntity>(entity =>
+        {
+            entity.ToTable("PrdMenus");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            // "Menu Name*" and "Description" are required by the 9.2 form while Database.md 9
+            // keeps both columns nullable - the validators enforce the form, the schema does not.
+            // Status / Start / End are the documented lengths and types (spec 9.2 "VALIDITY DATE").
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.StartDate).HasColumnType("date");
+            entity.Property(x => x.EndDate).HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 9): CompanyId from the JWT, indexed because the global
+            // query filter runs on every list.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Database.md 9: UQ (CompanyId, CategoryId, Name) among live rows - spec 9.2 "menu
+            // name must be unique per company within its reference group/category". Soft delete
+            // frees the name and the handler returns the friendly message instead of this firing.
+            entity.HasIndex(x => new { x.CompanyId, x.CategoryId, x.Name })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<MenuAccessibleCompanyEntity>(entity =>
+        {
+            entity.ToTable("PrdMenuAccessibleCompanies");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // No CompanyId here (Database.md 9 does not mark the table [T]): the row belongs to
+            // the menu, and AccessibleCompanyId is the shared-with company - the Raw Material
+            // shape, so the visibility filter can read it the same way.
+            entity.HasIndex(x => x.MenuId);
+            entity.HasOne<MenuEntity>()
+                .WithMany(x => x.AccessibleCompanies)
+                .HasForeignKey(x => x.MenuId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AccessibleCompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AccessibleCompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MenuRawMaterialEntity>(entity =>
+        {
+            entity.ToTable("PrdMenuRawMaterials");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.MenuId);
+            entity.HasOne<MenuEntity>()
+                .WithMany(x => x.RawMaterials)
+                .HasForeignKey(x => x.MenuId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.RawMaterialId);
+            entity.HasOne<RawMaterialEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RawMaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (MenuId, RawMaterialId) (Database.md 9): saving the modal replaces the list, so
+            // a dropped pair is a soft delete (CodingRules 7.1) and only the LIVE rows are kept
+            // unique - the same filter PD-02 gave PrdProductIngredients. The handlers answer the
+            // friendly message instead of letting this fire.
+            entity.HasIndex(x => new { x.MenuId, x.RawMaterialId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<ProductEntity>(entity =>
+        {
+            entity.ToTable("PrdProducts");
+            entity.HasKey(x => x.Id);
+            // The nullable columns (Database.md 9 without "*") carry the spec form's optional
+            // fields at their documented lengths; Name / ManufacturerSupplierId are required
+            // by the 9.1 form and are enforced in the validators, not by the schema.
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Code).HasMaxLength(500);
+            entity.Property(x => x.Gtin).HasMaxLength(50);
+            entity.Property(x => x.NutritionContentClaims).HasMaxLength(500);
+            entity.Property(x => x.PotentialAllergens).HasMaxLength(500);
+            entity.Property(x => x.CalorieContent).HasMaxLength(100);
+            entity.Property(x => x.AvailableAt).HasMaxLength(200);
+            entity.Property(x => x.PackagingSize).HasMaxLength(100);
+            entity.Property(x => x.QrCodeKey).HasMaxLength(100);
+            entity.Property(x => x.VerifyHalalPublishStatus).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 9): CompanyId from the JWT, indexed because the global
+            // query filter runs on every list. Database.md 9 defines NO unique index - the
+            // legacy product-name check is [VERIFY] and was not copied.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ManufacturerSupplierId);
+            entity.HasOne<ManufacturerSupplierEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ManufacturerSupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Three FKs into AdmGeneralData (Brand / Product Category / Marketing Method) -
+            // wired without navigations like RawMaterials' two dropdown columns above.
+            entity.HasIndex(x => x.BrandId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.MarketingMethodId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.MarketingMethodId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductIngredientEntity>(entity =>
+        {
+            entity.ToTable("PrdProductIngredients");
+            entity.HasKey(x => x.Id);
+            // The link/unlink toggle of spec 9.1 (Database.md 9): a 20-char status string, not
+            // a delete - see ProductIngredientMappingStatus.
+            entity.Property(x => x.MappingStatus).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.RawMaterialId);
+            entity.HasOne<RawMaterialEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RawMaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (ProductId, RawMaterialId) among live rows (Database.md 9): unlinking keeps the
+            // row and flips its status, so the pair can never appear twice - the handlers answer
+            // the friendly message instead of letting this fire.
+            entity.HasIndex(x => new { x.ProductId, x.RawMaterialId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<ProductImageEntity>(entity =>
+        {
+            entity.ToTable("PrdProductImages");
+            entity.HasKey(x => x.Id);
+            // Front / Back / Left / Right stored as their spec string (CodingRules 11).
+            entity.Property(x => x.Position).IsRequired().HasMaxLength(20).HasConversion<string>();
+            entity.Property(x => x.Version).IsRequired();
+            entity.Property(x => x.IsCurrent).IsRequired();
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // The replace path reads the four angles of one product on every upload; no unique
+            // index, because a replaced row is KEPT (history) next to the current one - only
+            // IsCurrent tells them apart (Database.md 9).
+            entity.HasIndex(x => new { x.ProductId, x.Position });
+            // Required File group (Database.md 9 "_ File"): a row only exists once a file has
+            // been uploaded.
+            entity.OwnsOne(x => x.Image, image =>
+            {
+                image.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                image.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                image.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                image.Property(f => f.SizeBytes).IsRequired();
+            });
+        });
+
         modelBuilder.Entity<NotificationEntity>(entity =>
         {
             entity.ToTable("AdmNotifications");
@@ -1248,9 +1470,10 @@ public class VHSmartDbContext(
             if (entityType.IsOwned() || !typeof(BaseClass).IsAssignableFrom(entityType.ClrType))
                 continue;
 
-            // RawMaterials carries the special "Accessible For" rule of CodingRules 7.3 and is
-            // configured after the loop.
-            if (entityType.ClrType == typeof(RawMaterialEntity))
+            // RawMaterials and PrdMenus carry the special "Accessible For" rule of CodingRules
+            // 7.3 and are configured after the loop.
+            if (entityType.ClrType == typeof(RawMaterialEntity)
+                || entityType.ClrType == typeof(MenuEntity))
                 continue;
 
             var parameter = Expression.Parameter(entityType.ClrType, "e");
@@ -1278,6 +1501,16 @@ public class VHSmartDbContext(
         // company listed in RawMaterialAccessibleCompanies ("Accessible For", >= 1 row) and to a
         // Switch Company = ALL token - in handlers as here, nowhere else.
         modelBuilder.Entity<RawMaterialEntity>().HasQueryFilter(row =>
+            !row.IsDeleted
+            && (CurrentIsPlatformAdminViewAll
+                || row.CompanyId == CurrentCompanyId
+                || row.AccessibleCompanies.Any(company =>
+                    !company.IsDeleted && company.AccessibleCompanyId == CurrentCompanyId)));
+
+        // CodingRules 7.3 / spec 9.2: a menu is visible to its owner company, to a company
+        // listed in PrdMenuAccessibleCompanies ("List of Company", >= 1 row) and to a Switch
+        // Company = ALL token - in handlers as here, nowhere else.
+        modelBuilder.Entity<MenuEntity>().HasQueryFilter(row =>
             !row.IsDeleted
             && (CurrentIsPlatformAdminViewAll
                 || row.CompanyId == CurrentCompanyId

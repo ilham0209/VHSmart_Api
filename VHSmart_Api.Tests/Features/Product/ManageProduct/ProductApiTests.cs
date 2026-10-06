@@ -7,8 +7,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using VHSmart_Api.Features.Product.ManageProduct;
 using VHSmart_Api.Shared.Domain.Calculators;
+using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Models;
+using VHSmart_Api.Tests.Shared.Infrastructure.Storage;
 
 namespace VHSmart_Api.Tests.Features.Product.ManageProduct;
 
@@ -478,5 +480,159 @@ public class ProductApiTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
         Assert.NotEmpty(await response.Content.ReadAsByteArrayAsync());
+    }
+
+    // Tab "Manage Attachment Information" (spec 9.1): Document Type* + Choose File, the four
+    // angles, D-22 (exactly 1200 x 1200) and the streamed picture.
+    private static MultipartFormDataContent ImageForm(
+        string documentType = "PRODUCT IMAGES (FRONT)",
+        byte[]? bytes = null,
+        string fileName = "front.png",
+        string contentType = "image/png")
+    {
+        var content = new MultipartFormDataContent();
+        if (documentType.Length > 0)
+            content.Add(new StringContent(documentType), "DocumentType");
+
+        var file = new ByteArrayContent(bytes ?? TestImages.Png(1200, 1200));
+        file.Headers.ContentType = new MediaTypeHeaderValue(contentType);
+        content.Add(file, "File", fileName);
+        return content;
+    }
+
+    [Fact]
+    public async Task GetImages_WithoutViewPermission_ReturnsForbidden()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId, grantPermissions: false);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{productId}/images");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadImage_WithoutCreatePermission_ReturnsForbidden()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId, grantPermissions: false);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsync(
+            $"{Route}/{productId}/images", ImageForm());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadImage_WithoutDocumentType_ReturnsBadRequest()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsync(
+            $"{Route}/{productId}/images", ImageForm(documentType: string.Empty));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadImage_WrongPixelSize_ReturnsUnprocessableEntity()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsync(
+            $"{Route}/{productId}/images",
+            ImageForm(bytes: TestImages.Png(800, 800)));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadImage_UnknownProduct_ReturnsNotFound()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsync(
+            $"{Route}/{Guid.NewGuid()}/images", ImageForm());
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadImage_ValidPng_ReturnsTheTableAndThePictureStreamsBack()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var upload = await client.PostAsync(
+            $"{Route}/{productId}/images",
+            ImageForm(documentType: "PRODUCT IMAGES (FRONT)", fileName: "front.png"));
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+
+        var rows = await ReadAsync<List<ProductImageResponse>>(await client.GetAsync($"{Route}/{productId}/images"));
+        Assert.NotNull(rows);
+        var row = Assert.Single(rows);
+        Assert.Equal("PRODUCT IMAGES (FRONT)", row.DocumentType);
+        Assert.Equal("front.png", row.DocumentName);
+        Assert.Equal(1, row.Version);
+        Assert.Equal(ProductImagePosition.Front, row.Position);
+
+        var picture = await client.GetAsync($"{Route}/{productId}/images/{row.Id}");
+        Assert.Equal(HttpStatusCode.OK, picture.StatusCode);
+        Assert.Equal("image/png", picture.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(
+            TestImages.Png(1200, 1200).Length,
+            (await picture.Content.ReadAsByteArrayAsync()).Length);
+    }
+
+    [Fact]
+    public async Task DeleteImage_ReturnsNoContentAndHidesTheRow()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var productId = await factory.SeedRowAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var upload = await client.PostAsync($"{Route}/{productId}/images", ImageForm());
+        var rows = await ReadAsync<List<ProductImageResponse>>(upload);
+        Assert.NotNull(rows);
+        var imageId = Assert.Single(rows).Id;
+
+        var delete = await client.DeleteAsync($"{Route}/{productId}/images/{imageId}");
+        Assert.Equal(HttpStatusCode.NoContent, delete.StatusCode);
+
+        var after = await ReadAsync<List<ProductImageResponse>>(
+            await client.GetAsync($"{Route}/{productId}/images"));
+        Assert.NotNull(after);
+        Assert.Empty(after);
+
+        var again = await client.DeleteAsync($"{Route}/{productId}/images/{imageId}");
+        Assert.Equal(HttpStatusCode.NotFound, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetImages_RowOfAnotherCompany_ReturnsNotFound()
+    {
+        using var factory = new ProductApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var foreignId = await factory.SeedRowAsync(companyId: Guid.NewGuid());
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{foreignId}/images");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 }

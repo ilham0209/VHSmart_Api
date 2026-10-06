@@ -59,6 +59,8 @@ public class VHSmartDbContext(
 
     public DbSet<PremiseAttachmentEntity> PremiseAttachments => Set<PremiseAttachmentEntity>();
 
+    public DbSet<ProductImageEntity> ProductImages => Set<ProductImageEntity>();
+
     public DbSet<ProductIngredientEntity> ProductIngredients => Set<ProductIngredientEntity>();
 
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
@@ -811,6 +813,41 @@ public class VHSmartDbContext(
             entity.HasIndex(x => new { x.ProductId, x.RawMaterialId })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<ProductImageEntity>(entity =>
+        {
+            entity.ToTable("PrdProductImages");
+            entity.HasKey(x => x.Id);
+            // Front / Back / Left / Right stored as their spec string (CodingRules 11).
+            entity.Property(x => x.Position).IsRequired().HasMaxLength(20).HasConversion<string>();
+            entity.Property(x => x.Version).IsRequired();
+            entity.Property(x => x.IsCurrent).IsRequired();
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // The replace path reads the four angles of one product on every upload; no unique
+            // index, because a replaced row is KEPT (history) next to the current one - only
+            // IsCurrent tells them apart (Database.md 9).
+            entity.HasIndex(x => new { x.ProductId, x.Position });
+            // Required File group (Database.md 9 "_ File"): a row only exists once a file has
+            // been uploaded.
+            entity.OwnsOne(x => x.Image, image =>
+            {
+                image.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                image.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                image.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                image.Property(f => f.SizeBytes).IsRequired();
+            });
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

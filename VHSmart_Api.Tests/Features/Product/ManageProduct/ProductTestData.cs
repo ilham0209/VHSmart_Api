@@ -251,6 +251,38 @@ internal static class ProductTestData
         return row.Id;
     }
 
+    // A row of the image table (Database.md 9): isCurrent = false marks the superseded version
+    // the tab never lists. The bytes are not written - a test that streams the picture uploads
+    // through the real handler instead.
+    public static async Task<Guid> SeedProductImageAsync(
+        TestableVHSmartDbContext db,
+        Guid productId,
+        ProductImagePosition position,
+        int version = 1,
+        bool isCurrent = true,
+        Guid? companyId = null,
+        string fileName = "front.png")
+    {
+        var row = new ProductImageEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            ProductId = productId,
+            Position = position,
+            Version = version,
+            IsCurrent = isCurrent,
+            Image = new StoredFile
+            {
+                FileName = fileName,
+                StorageKey = $"{Guid.NewGuid():N}",
+                ContentType = "image/png",
+                SizeBytes = 4
+            }
+        };
+        db.ProductImages.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
     public static async Task<CreateProductCommand> CommandAsync(
         TestableVHSmartDbContext db,
         string? name = "Santan Kicap",

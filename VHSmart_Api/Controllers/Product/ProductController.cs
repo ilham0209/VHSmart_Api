@@ -87,6 +87,40 @@ public class ProductController(ISender sender) : ControllerBase
         return File(response.Content, response.ContentType);
     }
 
+    // Tab "Manage Attachment Information" (spec 9.1): the table of current images, the upload
+    // form (Document Type* + Choose File) and the streamed picture. The four angles, the
+    // D-22 file rules (jpg / jpeg / png, 10 MB, exactly 1200 x 1200 px) and the version
+    // counter are enforced in the handlers, never here.
+    [HttpGet("{id:guid}/images")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.View)]
+    public async Task<IActionResult> GetImages(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(new GetProductImagesQuery(id), ct));
+
+    [HttpGet("{id:guid}/images/{imageId:guid}")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.View)]
+    public async Task<IActionResult> GetImage(Guid id, Guid imageId, CancellationToken ct)
+    {
+        var response = await sender.Send(new GetProductImageQuery(id, imageId), ct);
+        return File(response.Content, response.ContentType);
+    }
+
+    [HttpPost("{id:guid}/images")]
+    [Consumes("multipart/form-data")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.Create)]
+    public async Task<IActionResult> UploadImage(
+        Guid id,
+        [FromForm] UploadProductImageCommand command,
+        CancellationToken ct) =>
+        Ok(await sender.Send(command with { ProductId = id }, ct));
+
+    [HttpDelete("{id:guid}/images/{imageId:guid}")]
+    [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.Delete)]
+    public async Task<IActionResult> DeleteImage(Guid id, Guid imageId, CancellationToken ct)
+    {
+        await sender.Send(new DeleteProductImageCommand(id, imageId), ct);
+        return NoContent();
+    }
+
     [HttpPut("{id:guid}")]
     [HasPermission(PermissionKeys.ProductManageProduct, PermissionAction.Edit)]
     public async Task<IActionResult> Update(

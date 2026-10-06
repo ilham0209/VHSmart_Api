@@ -303,23 +303,46 @@ internal sealed class ProductApiFactory : WebApplicationFactory<Program>
 }
 
 // Answers any storage key, so a download route can be exercised end to end without a
-// storage root.
+// storage root. Uploads are remembered per key: the product-image tab both stores a picture
+// and streams it back in one test, and a delete must drop the bytes like LocalFileStorage.
 internal sealed class StubFileStorage : IFileStorage
 {
-    public Task<StoredFile> SaveAsync(
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _files = new();
+
+    public async Task<StoredFile> SaveAsync(
         Stream content,
         string fileName,
         string contentType,
-        CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        CancellationToken cancellationToken = default)
+    {
+        using var buffer = new MemoryStream();
+        await content.CopyToAsync(buffer, cancellationToken);
+        var bytes = buffer.ToArray();
+
+        var storageKey = $"{Guid.NewGuid():N}";
+        _files[storageKey] = bytes;
+
+        return new StoredFile
+        {
+            FileName = fileName,
+            StorageKey = storageKey,
+            ContentType = contentType,
+            SizeBytes = bytes.Length
+        };
+    }
 
     public Task<Stream> OpenReadAsync(
         string storageKey,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult<Stream>(new MemoryStream("certificate"u8.ToArray()));
+        Task.FromResult<Stream>(new MemoryStream(
+            _files.TryGetValue(storageKey, out var bytes) ? bytes : "certificate"u8.ToArray()));
 
+    // Idempotent, like LocalFileStorage: deleting an unknown key is not an error.
     public Task DeleteAsync(
         string storageKey,
-        CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException();
+        CancellationToken cancellationToken = default)
+    {
+        _files.TryRemove(storageKey, out _);
+        return Task.CompletedTask;
+    }
 }

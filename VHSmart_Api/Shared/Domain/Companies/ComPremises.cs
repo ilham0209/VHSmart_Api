@@ -34,8 +34,9 @@ public class PremiseEntity : BaseClass, ITenantEntity
 
     public GeneralDataEntity? Brand { get; set; }
 
-    // Database.md 7 links this to PrdMenuConcepts, but that table arrives with the Product
-    // tasks (PD-xx) and does not exist in the model yet - no FK is configured until then.
+    // Database.md 7 links this to PrdMenuConcepts. The FK was deferred until that table
+    // landed (PD-05); the confirmed 7.7 form still does not edit it, so only the read joins
+    // (PR-04) use the value.
     public Guid? MenuConceptId { get; set; }
 
     // The spec form asks "Select Premise Manager from All Staff Information?" - Yes picks a

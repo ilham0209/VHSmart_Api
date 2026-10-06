@@ -66,6 +66,10 @@ public class VHSmartDbContext(
 
     public DbSet<MenuEntity> Menus => Set<MenuEntity>();
 
+    public DbSet<MenuConceptEntity> MenuConcepts => Set<MenuConceptEntity>();
+
+    public DbSet<MenuConceptMenuEntity> MenuConceptMenus => Set<MenuConceptMenuEntity>();
+
     public DbSet<ProductImageEntity> ProductImages => Set<ProductImageEntity>();
 
     public DbSet<ProductIngredientEntity> ProductIngredients => Set<ProductIngredientEntity>();
@@ -431,6 +435,13 @@ public class VHSmartDbContext(
             entity.HasOne(x => x.Tag)
                 .WithMany()
                 .HasForeignKey(x => x.TagId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Database.md 7: the premise points at a Menu Concept. The column existed from
+            // PR-01 but the FK was deferred until PrdMenuConcepts landed (PD-05).
+            entity.HasIndex(x => x.MenuConceptId);
+            entity.HasOne<MenuConceptEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.MenuConceptId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -815,6 +826,56 @@ public class VHSmartDbContext(
             // unique - the same filter PD-02 gave PrdProductIngredients. The handlers answer the
             // friendly message instead of letting this fire.
             entity.HasIndex(x => new { x.MenuId, x.RawMaterialId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<MenuConceptEntity>(entity =>
+        {
+            entity.ToTable("PrdMenuConcepts");
+            entity.HasKey(x => x.Id);
+            // "Menu Concept*" is required by the 9.3 modal while Database.md 9 keeps the
+            // column nullable - the validator enforces the form, the schema does not.
+            entity.Property(x => x.Name).HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 9): CompanyId = "For Company*", from the JWT.
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MenuConceptMenuEntity>(entity =>
+        {
+            entity.ToTable("PrdMenuConceptMenus");
+            entity.HasKey(x => x.Id);
+            // Link/unlink keeps the row and flips this status (MenuConceptMenuMappingStatus),
+            // so the pair is never deleted - see the filtered unique index below.
+            entity.Property(x => x.MappingStatus).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.MenuConceptId);
+            entity.HasOne<MenuConceptEntity>()
+                .WithMany(x => x.Menus)
+                .HasForeignKey(x => x.MenuConceptId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.MenuId);
+            entity.HasOne<MenuEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.MenuId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (MenuConceptId, MenuId) among live rows (Database.md 9): a pair may be
+            // unlinked and linked again, but only ever as ONE live row - the handlers answer
+            // the friendly message instead of letting this fire.
+            entity.HasIndex(x => new { x.MenuConceptId, x.MenuId })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
         });

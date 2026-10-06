@@ -25,14 +25,18 @@ namespace VHSmart_Api.Tests.Features.Product.ManageMenu;
 // Product.ManageMenu screen (all four actions). CompanyId defaults to one fixed value per
 // factory (the JWT carries it and the seeded rows carry it, so the tenant filter sees its own
 // data); a test may mint a token for another company to prove a foreign or shared menu stays
-// read-only.
-internal sealed class MenuApiFactory : WebApplicationFactory<Program>
+// read-only. Not sealed: the Manage Menu Concept factory (PD-05) reuses this pipeline with its
+// own screen key - the two screens are a list and its detail screen in the same spec section.
+internal class MenuApiFactory : WebApplicationFactory<Program>
 {
     private static readonly string TestSigningKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
     private readonly Guid _grantedRoleId;
     private readonly bool _grantPermissions;
     private readonly string _databaseName = $"VHSmartMenuApiTests-{Guid.NewGuid():N}";
+
+    // The screen the permission stub grants.
+    protected virtual string PermissionKey => PermissionKeys.ProductManageMenu;
 
     public MenuApiFactory(Guid grantedRoleId, bool grantPermissions = true)
     {
@@ -260,7 +264,7 @@ internal sealed class MenuApiFactory : WebApplicationFactory<Program>
 
             var actions = new[] { PermissionAction.View, PermissionAction.Create, PermissionAction.Edit, PermissionAction.Delete };
             var granted = _grantPermissions
-                ? actions.Select(action => (_grantedRoleId, PermissionKeys.ProductManageMenu, action)).ToArray()
+                ? actions.Select(action => (_grantedRoleId, PermissionKey, action)).ToArray()
                 : Array.Empty<(Guid, string, PermissionAction)>();
 
             services.AddSingleton<IPermissionService>(new StubPermissionService(granted));

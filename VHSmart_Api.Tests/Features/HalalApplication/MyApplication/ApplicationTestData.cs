@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using VHSmart_Api.Features.HalalApplication.MyApplication;
+using VHSmart_Api.Shared.Domain;
+using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
 using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Infrastructure.Sequences;
@@ -90,7 +92,8 @@ internal static class ApplicationTestData
         string status = ApplicationStatus.Draft,
         DateTime? statusDate = null,
         string applicationType = "New",
-        string? cbApplicationNo = null)
+        string? cbApplicationNo = null,
+        DateOnly? cbApplicationDate = null)
     {
         var row = new ApplicationEntity
         {
@@ -102,6 +105,7 @@ internal static class ApplicationTestData
             SchemeId = schemeId ?? await ProductSchemeIdAsync(db),
             BatchId = batchId,
             CbApplicationNo = cbApplicationNo,
+            CbApplicationDate = cbApplicationDate,
             // The D-08 key, as every stored application has it (the gate blocks the rest).
             SurveyReadProcedureManual = true,
             SurveyReadMs1500 = true,
@@ -137,5 +141,77 @@ internal static class ApplicationTestData
             FreeText = freeText
         });
         await db.SaveChangesAsync();
+    }
+
+    // The company's certification body: the D-26 submit status carries its name (spec 12.7
+    // "the CB name may vary by company's CB"). JAKIM is the name of the spec sample.
+    public static async Task<Guid> SeedCertificationBodyAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId,
+        string name = "JAKIM")
+    {
+        var countryId = await db.Countries.AsNoTracking()
+            .Where(row => row.IsoCode == "MYS")
+            .Select(row => row.Id)
+            .FirstAsync();
+        var certificationBody = new CertificationBodyEntity
+        {
+            Name = name,
+            CountryId = countryId
+        };
+        db.CertificationBodies.Add(certificationBody);
+        var company = await db.Companies.SingleAsync(row => row.Id == companyId);
+        company.CertificationBodyId = certificationBody.Id;
+        await db.SaveChangesAsync();
+        return certificationBody.Id;
+    }
+
+    // The R-06 document types of the Attachment side tab (spec 12.5, For View =
+    // Halal Application).
+    public static async Task<Guid> SeedSupportingDocumentAsync(
+        TestableVHSmartDbContext db,
+        string documentType,
+        Guid? companyId = null,
+        SupportingDocumentForView forView = SupportingDocumentForView.HalalApplication,
+        int documentSequence = 1)
+    {
+        var row = new SupportingDocumentEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            ForView = forView,
+            DocumentType = documentType,
+            DocumentSequence = documentSequence
+        };
+        db.SupportingDocuments.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    // An already-uploaded attachment: the list and the download tests only need the stored
+    // metadata, so they skip the storage layer the upload handler uses.
+    public static async Task<Guid> SeedApplicationAttachmentAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId,
+        Guid applicationId,
+        Guid documentTypeId,
+        string fileName = "supporting-document.pdf",
+        string? storageKey = null)
+    {
+        var row = new ApplicationAttachmentEntity
+        {
+            CompanyId = companyId,
+            ApplicationId = applicationId,
+            DocumentTypeId = documentTypeId,
+            Document = new StoredFile
+            {
+                FileName = fileName,
+                StorageKey = storageKey ?? Guid.NewGuid().ToString("D"),
+                ContentType = "application/pdf",
+                SizeBytes = 4
+            }
+        };
+        db.ApplicationAttachments.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
     }
 }

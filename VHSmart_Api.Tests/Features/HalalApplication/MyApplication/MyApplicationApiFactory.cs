@@ -30,11 +30,13 @@ internal sealed class MyApplicationApiFactory : WebApplicationFactory<Program>
 
     private readonly Guid _grantedRoleId;
     private readonly PermissionAction[] _grantedActions;
+    private readonly string _permissionKey;
     private readonly string _databaseName = $"VHSmartMyApplicationApiTests-{Guid.NewGuid():N}";
 
     public MyApplicationApiFactory(
         Guid grantedRoleId,
-        PermissionAction[]? grantedActions = null)
+        PermissionAction[]? grantedActions = null,
+        string permissionKey = PermissionKeys.HalalApplicationMyApplication)
     {
         _grantedRoleId = grantedRoleId;
         _grantedActions = grantedActions ??
@@ -42,6 +44,7 @@ internal sealed class MyApplicationApiFactory : WebApplicationFactory<Program>
             PermissionAction.View, PermissionAction.Create,
             PermissionAction.Edit, PermissionAction.Delete
         ];
+        _permissionKey = permissionKey;
     }
 
     public Guid CompanyId { get; } = Guid.NewGuid();
@@ -122,7 +125,7 @@ internal sealed class MyApplicationApiFactory : WebApplicationFactory<Program>
 
             var granted = _grantedActions
                 .Select(action =>
-                    (_grantedRoleId, PermissionKeys.HalalApplicationMyApplication, action))
+                    (_grantedRoleId, _permissionKey, action))
                 .ToArray();
 
             services.AddSingleton<IPermissionService>(new StubPermissionService(granted));

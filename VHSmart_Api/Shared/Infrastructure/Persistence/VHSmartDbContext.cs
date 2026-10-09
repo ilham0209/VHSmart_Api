@@ -91,6 +91,15 @@ public class VHSmartDbContext(
     public DbSet<ApplicationAdditionalInfoItemEntity> ApplicationAdditionalInfoItems =>
         Set<ApplicationAdditionalInfoItemEntity>();
 
+    public DbSet<ApplicationAttachmentEntity> ApplicationAttachments =>
+        Set<ApplicationAttachmentEntity>();
+
+    public DbSet<HalalCertificateEntity> HalalCertificates =>
+        Set<HalalCertificateEntity>();
+
+    public DbSet<CertificateItemEntity> CertificateItems =>
+        Set<CertificateItemEntity>();
+
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
 
@@ -1188,6 +1197,110 @@ public class VHSmartDbContext(
             entity.HasOne<ApplicationEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ApplicationAttachmentEntity>(entity =>
+        {
+            entity.ToTable("AppApplicationAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.DocumentTypeId);
+            entity.HasOne(x => x.DocumentType)
+                .WithMany()
+                .HasForeignKey(x => x.DocumentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Required File group (Database.md 10 "Document File"): a row only exists once a
+            // file has been uploaded, exactly like the Raw Material attachment.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
+            });
+        });
+
+        modelBuilder.Entity<HalalCertificateEntity>(entity =>
+        {
+            entity.ToTable("AppHalalCertificates");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CertificateNo).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, CertificateNo) among live rows (Database.md 10): one number
+            // identifies one certificate per company, whichever application holds it.
+            entity.HasIndex(x => new { x.CompanyId, x.CertificateNo })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            // Document File is optional (Database.md 10 marks no asterisk): nullable owned
+            // columns, same shape as the minutes-meeting attachment document.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
+            });
+        });
+
+        modelBuilder.Entity<CertificateItemEntity>(entity =>
+        {
+            entity.ToTable("AppCertificateItems");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ItemName).IsRequired().HasMaxLength(300);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<PremiseEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BrandId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.HalalCertificateId);
+            entity.HasOne<HalalCertificateEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.HalalCertificateId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

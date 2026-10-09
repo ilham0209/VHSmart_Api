@@ -9,6 +9,7 @@ using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
 using VHSmart_Api.Shared.Models;
+using VHSmart_Api.Tests.Features.HalalApplication.ManageBatch;
 
 namespace VHSmart_Api.Tests.Features.HalalApplication.MyApplication;
 
@@ -500,6 +501,307 @@ public class MyApplicationApiTests
         using var client = CreateAuthorizedClient(factory, companyId: Guid.NewGuid());
 
         var response = await client.GetAsync($"{Route}/{applicationId}");
+        var problem = await ReadAsync<ProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("Application not found.", problem?.Detail);
+    }
+
+    private static MultipartFormDataContent AttachmentForm(
+        Guid documentTypeId,
+        string? fileName = "supporting.pdf")
+    {
+        var content = new MultipartFormDataContent();
+        content.Add(new StringContent(documentTypeId.ToString()), "DocumentTypeId");
+        if (fileName is not null)
+        {
+            var file = new ByteArrayContent([37, 80, 68, 70]); // %PDF magic bytes
+            file.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
+            content.Add(file, "File", fileName);
+        }
+
+        return content;
+    }
+
+    private static SubmitApplicationCommand Acknowledgement(Guid applicationId) =>
+        new(
+            applicationId,
+            "Ahmad bin Ali",
+            "ahmad@example.com",
+            "+60123456789",
+            true);
+
+    [Fact]
+    public async Task UploadAttachments_WithoutCreatePermission_ReturnsForbidden()
+    {
+        using var factory = new MyApplicationApiFactory(
+            AdminRoleId, grantedActions: [PermissionAction.View]);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsync(
+            $"{Route}/{applicationId}/attachments", AttachmentForm(Guid.NewGuid()));
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task UploadAttachments_ValidForm_ReturnsTheUploadedRow()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        var documentTypeId = await factory.SeedAsync(db =>
+            ApplicationTestData.SeedSupportingDocumentAsync(db, "HAS", companyId: factory.CompanyId));
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsync(
+            $"{Route}/{applicationId}/attachments", AttachmentForm(documentTypeId, "upload.pdf"));
+        var payload = await ReadAsync<ApplicationAttachmentResponse[]>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        var row = Assert.Single(payload);
+        Assert.Equal("HAS", row.DocumentType);
+        Assert.Equal("upload.pdf", row.FileName);
+
+        // The list and the streamed download (the Action cell) answer the same row.
+        var list = await client.GetAsync($"{Route}/{applicationId}/attachments");
+        var listed = Assert.Single(
+            await ReadAsync<ApplicationAttachmentResponse[]>(list) ?? []);
+        Assert.Equal(documentTypeId, listed.DocumentTypeId);
+
+        var download = await client.GetAsync(
+            $"{Route}/{applicationId}/attachments/{row.Id}/document");
+        Assert.Equal(HttpStatusCode.OK, download.StatusCode);
+        Assert.Equal(
+            new byte[] { 37, 80, 68, 70 },
+            await download.Content.ReadAsByteArrayAsync());
+    }
+
+    [Fact]
+    public async Task UploadAttachments_DisallowedFileType_ReturnsUnprocessableEntity()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        var documentTypeId = await factory.SeedAsync(db =>
+            ApplicationTestData.SeedSupportingDocumentAsync(db, "HAS", companyId: factory.CompanyId));
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsync(
+            $"{Route}/{applicationId}/attachments", AttachmentForm(documentTypeId, "payload.exe"));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Submit_WithoutEditPermission_ReturnsForbidden()
+    {
+        using var factory = new MyApplicationApiFactory(
+            AdminRoleId, grantedActions: [PermissionAction.View]);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsJsonAsync(
+            $"{Route}/{applicationId}/submit", Acknowledgement(applicationId), Json);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Submit_NoBatch_Returns422WithTheBatchMessage()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsJsonAsync(
+            $"{Route}/{applicationId}/submit", Acknowledgement(applicationId), Json);
+        var problem = await ReadAsync<ProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Equal("A batch must be selected before submission.", problem.Detail);
+    }
+
+    [Fact]
+    public async Task Submit_CheckboxUnchecked_Returns400WithTheAcknowledgementMessage()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var command = Acknowledgement(applicationId) with { AckAccepted = false };
+        var response = await client.PostAsJsonAsync(
+            $"{Route}/{applicationId}/submit", command, Json);
+        var problem = await ReadAsync<ValidationProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Contains(
+            "The acknowledgement must be accepted.",
+            problem.Errors.Values.SelectMany(value => value));
+    }
+
+    [Fact]
+    public async Task Submit_FullyReadyApplication_ReturnsProcessingAtTheCb()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        await factory.SeedAsync(db =>
+            ApplicationTestData.SeedCertificationBodyAsync(db, factory.CompanyId));
+        var batchId = await factory.SeedAsync(async db =>
+        {
+            var schemeId = await BatchTestData.FoodPremiseSchemeIdAsync(db);
+            return await BatchTestData.SeedBatchAsync(
+                db, factory.CompanyId, schemeId: schemeId);
+        });
+        var premiseId = await factory.SeedAsync(db =>
+            BatchTestData.SeedCompletePremiseAsync(db, factory.CompanyId));
+        await factory.SeedAsync(db =>
+            BatchTestData.SeedBatchPremiseAsync(db, factory.CompanyId, batchId, premiseId));
+        var applicationId = await factory.SeedAsync(db =>
+            ApplicationTestData.SeedApplicationAsync(
+                db,
+                factory.CompanyId,
+                batchId: batchId,
+                cbApplicationNo: "CB-2026-001",
+                cbApplicationDate: new DateOnly(2026, 10, 1)));
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PostAsJsonAsync(
+            $"{Route}/{applicationId}/submit", Acknowledgement(applicationId), Json);
+        var payload = await ReadAsync<ApplicationSubmitResponse>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("PROCESSING AT JAKIM (NEW)", payload.Status);
+        Assert.NotNull(payload.SubmittedAt);
+
+        // The header block of the screen now shows the submit state.
+        var detail = await ReadAsync<ApplicationDetailResponse>(
+            await client.GetAsync($"{Route}/{applicationId}"));
+        Assert.NotNull(detail);
+        Assert.Equal("PROCESSING AT JAKIM (NEW)", detail.Status);
+    }
+
+    private static Task<Guid> SeedSubmittedApplicationAsync(
+        MyApplicationApiFactory factory,
+        string status = "PROCESSING AT JAKIM (NEW)") =>
+        factory.SeedAsync(db => ApplicationTestData.SeedApplicationAsync(
+            db, factory.CompanyId, status: status));
+
+    [Fact]
+    public async Task TagStatus_WithoutEditPermission_ReturnsForbidden()
+    {
+        using var factory = new MyApplicationApiFactory(
+            AdminRoleId, grantedActions: [PermissionAction.View]);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await SeedSubmittedApplicationAsync(factory);
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/status",
+            new TagApplicationStatusCommand(
+                applicationId, ApplicationStatus.ApplicationApproved, null),
+            Json);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TagStatus_FromProcessing_ReturnsTheApprovedStatus()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await SeedSubmittedApplicationAsync(factory);
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/status",
+            new TagApplicationStatusCommand(
+                applicationId, ApplicationStatus.ApplicationApproved, "Audit booked."),
+            Json);
+        var payload = await ReadAsync<ApplicationStatusTagResponse>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal(ApplicationStatus.ApplicationApproved, payload.Status);
+
+        var detail = await ReadAsync<ApplicationDetailResponse>(
+            await client.GetAsync($"{Route}/{applicationId}"));
+        Assert.NotNull(detail);
+        Assert.Equal(ApplicationStatus.ApplicationApproved, detail.Status);
+    }
+
+    [Fact]
+    public async Task TagStatus_Backwards_ReturnsUnprocessableEntity()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await SeedSubmittedApplicationAsync(
+            factory, ApplicationStatus.AuditInProgress);
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/status",
+            new TagApplicationStatusCommand(
+                applicationId, ApplicationStatus.ApplicationApproved, null),
+            Json);
+        var problem = await ReadAsync<ProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Equal("Application status can only move forward.", problem.Detail);
+    }
+
+    [Fact]
+    public async Task TagStatus_UnknownStatusValue_Returns400WithTheMessage()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await SeedSubmittedApplicationAsync(factory);
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/status",
+            new TagApplicationStatusCommand(applicationId, "Payment Confirmed", null),
+            Json);
+        var problem = await ReadAsync<ValidationProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Contains(
+            "Status must be Application Approved, Audit (In Progress), "
+                + "Audit (Completed) or Approved with Document.",
+            problem.Errors.Values.SelectMany(value => value));
+    }
+
+    [Fact]
+    public async Task TagStatus_ForeignApplicationToken_ReturnsNotFound()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await SeedSubmittedApplicationAsync(factory);
+        using var client = CreateAuthorizedClient(factory, companyId: Guid.NewGuid());
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/status",
+            new TagApplicationStatusCommand(
+                applicationId, ApplicationStatus.ApplicationApproved, null),
+            Json);
         var problem = await ReadAsync<ProblemDetails>(response);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

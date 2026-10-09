@@ -10,8 +10,8 @@ namespace VHSmart_Api.Features.HalalApplication.MyApplication;
 // "List of Application" (spec 12.3, [CONFIRMED] columns): Action is client side (only the
 // Id is needed), Type is ApplicationType, Company Name and Scheme are joined display names,
 // CB Application No. is the row's own column (null until submit fills it), Halal Expiry
-// Date belongs to the certificate (AppHalalCertificates, HA-06) so it is always null for
-// now - the column ships because the spec screen shows it. Status / Status Date are the
+// Date would come from AppHalalCertificates but which certificate's expiry the column shows
+// is unspecified, so it stays null (flagged). Status / Status Date are the
 // D-26 pair. Scheme and BatchName are two fields so the column stays sortable; the screen
 // renders "Scheme (with batch name)" from both. The spec shows no search box, so only
 // paging and sorting are supported; default order is Status Date descending (the spec
@@ -69,8 +69,10 @@ public class GetAllApplicationsHandler(VHSmartDbContext db, ICurrentUser user)
                         .Select(batch => batch.Name)
                         .FirstOrDefault(),
                 row.CbApplicationNo,
-                // AppHalalCertificates does not exist until HA-06 - the spec column is
-                // always null for now (same stance as CB Application No. in HA-01's list).
+                // Halal Expiry Date belongs to the certificates (AppHalalCertificates now
+                // exist, HA-06): an application may hold SEVERAL certificate numbers and the
+                // spec never says which expiry the column shows, so it stays null rather
+                // than inventing an "earliest / latest" rule (question for the owner).
                 null,
                 row.Status,
                 row.StatusDate))

@@ -29,6 +29,8 @@ public class VHSmartDbContext(
 
     public DbSet<AuditPrefixEntity> AuditPrefixes => Set<AuditPrefixEntity>();
 
+    public DbSet<RecommendationEntity> Recommendations => Set<RecommendationEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -189,6 +191,24 @@ public class VHSmartDbContext(
             entity.HasIndex(x => new { x.CompanyId, x.BrandId })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<RecommendationEntity>(entity =>
+        {
+            entity.ToTable("AudRecommendations");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(2000);
+            entity.Property(x => x.RecommendationCode).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // No unique rule for recommendations (Database.md 14.3 "Free-text code"): the
+            // spec states none and codes look free (spec 14.3 samples).
         });
 
         modelBuilder.Entity<CertificationBodyEntity>(entity =>

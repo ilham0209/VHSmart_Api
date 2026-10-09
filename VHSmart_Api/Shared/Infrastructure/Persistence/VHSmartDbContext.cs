@@ -36,6 +36,14 @@ public class VHSmartDbContext(
     public DbSet<FindingRecommendationEntity> FindingRecommendations =>
         Set<FindingRecommendationEntity>();
 
+    public DbSet<AuditCriteriaMasterEntity> AuditCriteriaMasters =>
+        Set<AuditCriteriaMasterEntity>();
+
+    public DbSet<AuditCriteriaEntity> AuditCriteria => Set<AuditCriteriaEntity>();
+
+    public DbSet<AuditCriteriaFindingEntity> AuditCriteriaFindings =>
+        Set<AuditCriteriaFindingEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -267,6 +275,90 @@ public class VHSmartDbContext(
             entity.HasIndex(x => new { x.FindingId, x.RecommendationId })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<AuditCriteriaMasterEntity>(entity =>
+        {
+            entity.ToTable("AudAuditCriteriaMasters");
+            entity.HasKey(x => x.Id);
+            // Enum stored as its Database.md string (CodingRules 11), e.g. "SubCriteria".
+            entity.Property(x => x.Kind).IsRequired().HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Text).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, Kind, Text) among live rows (Database.md 11): the same text may
+            // exist once per Kind, and a soft delete frees it for re-use.
+            entity.HasIndex(x => new { x.CompanyId, x.Kind, x.Text })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<AuditCriteriaEntity>(entity =>
+        {
+            entity.ToTable("AudAuditCriteria");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CategorySequence).IsRequired();
+            entity.Property(x => x.CriteriaSequence).IsRequired();
+            entity.Property(x => x.ReferenceCategory).HasMaxLength(100);
+            entity.Property(x => x.Reference).HasMaxLength(200);
+            // Database.md 11 "default 1" is an APP-level default (entity initializer +
+            // the command's null-coalesce, the ApplicationType stance): a DDL DEFAULT would
+            // make EF treat an explicit 0 as "unset" and rewrite it to 1 - and 0 is the
+            // open question of spec 14.5 [VERIFY].
+            entity.Property(x => x.PotentialPoint).HasColumnType("decimal(6,2)");
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CriteriaId);
+            entity.HasOne<AuditCriteriaMasterEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CriteriaId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SubCriteriaId);
+            entity.HasOne<AuditCriteriaMasterEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SubCriteriaId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AuditCriteriaFindingEntity>(entity =>
+        {
+            entity.ToTable("AudAuditCriteriaFindings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AuditCriteriaId);
+            entity.HasOne<AuditCriteriaEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AuditCriteriaId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.FindingId);
+            entity.HasOne<FindingEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.FindingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // NO unique pair: Database.md 11 states "UQ pair" for the other junctions but
+            // not for this one - duplicates are collapsed in the handler instead (flagged).
         });
 
         modelBuilder.Entity<CertificationBodyEntity>(entity =>

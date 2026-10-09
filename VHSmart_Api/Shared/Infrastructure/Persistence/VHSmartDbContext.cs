@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
+using VHSmart_Api.Shared.Domain.Audit;
 using VHSmart_Api.Shared.Domain.Companies;
 using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Domain.Product;
@@ -25,6 +26,8 @@ public class VHSmartDbContext(
 
     public bool CurrentIsPlatformAdminViewAll { get; } =
         currentUser.IsPlatformAdmin || currentUser.ViewAllCompanies;
+
+    public DbSet<AuditPrefixEntity> AuditPrefixes => Set<AuditPrefixEntity>();
 
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
@@ -161,6 +164,33 @@ public class VHSmartDbContext(
 
     private static void ApplyTableConfiguration(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<AuditPrefixEntity>(entity =>
+        {
+            entity.ToTable("AudAuditPrefixes");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Prefix).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.Description).HasMaxLength(500);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            // The BrandId edge is the AdmGeneralData (Group COMPANY, Category Brand) row the
+            // prefix slot belongs to; deletes are always soft (CodingRules 7.1).
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, BrandId) among live rows (Database.md 14.2 "VERIFY, default
+            // enforce"): one prefix slot per brand; a soft delete frees the slot. The handler
+            // returns the friendly message instead of letting this fire.
+            entity.HasIndex(x => new { x.CompanyId, x.BrandId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
         modelBuilder.Entity<CertificationBodyEntity>(entity =>
         {
             entity.ToTable("AdmCertificationBodies");

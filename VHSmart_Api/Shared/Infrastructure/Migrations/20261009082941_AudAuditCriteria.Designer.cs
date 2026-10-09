@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using VHSmart_Api.Shared.Infrastructure.Persistence;
 namespace VHSmart_Api.Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(VHSmartDbContext))]
-    partial class VHSmartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261009082941_AudAuditCriteria")]
+    partial class AudAuditCriteria
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -4326,102 +4329,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AdmWebLinks", (string)null);
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditChecklistCriteriaEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AuditCriteriaId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ChecklistId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AuditCriteriaId");
-
-                    b.HasIndex("ChecklistId");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CompanyId", "ChecklistId", "AuditCriteriaId")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("AudAuditChecklistCriteria", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditChecklistEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ChecklistCategoryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(1000)
-                        .HasColumnType("nvarchar(1000)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ChecklistCategoryId");
-
-                    b.HasIndex("CompanyId");
-
-                    b.ToTable("AudAuditChecklists", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditCriteriaEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4582,88 +4489,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("AudAuditCriteriaMasters", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditPlanEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AssignedByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("AuditPurposeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AuditReferenceNo")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<Guid>("AuditTypeId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CategoryId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ChecklistId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("DateAssigned")
-                        .HasColumnType("date");
-
-                    b.Property<Guid>("GroupAuditorId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<Guid>("PremiseId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("ScheduleDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AssignedByUserId");
-
-                    b.HasIndex("AuditPurposeId");
-
-                    b.HasIndex("AuditTypeId");
-
-                    b.HasIndex("CategoryId");
-
-                    b.HasIndex("ChecklistId");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("PremiseId");
-
-                    b.HasIndex("CompanyId", "AuditReferenceNo")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("AudAuditPlans", (string)null);
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditPrefixEntity", b =>
@@ -7455,42 +7280,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditChecklistCriteriaEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.AuditCriteriaEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AuditCriteriaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.AuditChecklistEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ChecklistId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditChecklistEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ChecklistCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditCriteriaEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
@@ -7543,51 +7332,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
                         .WithMany()
                         .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditPlanEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.UserEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AssignedByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AuditPurposeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("AuditTypeId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CategoryId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.AuditChecklistEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ChecklistId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.PremiseEntity", null)
-                        .WithMany()
-                        .HasForeignKey("PremiseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

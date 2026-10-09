@@ -2,7 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.Premise.ManagePremise;
 using VHSmart_Api.Shared.Domain.Calculators;
 using VHSmart_Api.Shared.Domain.Companies;
+using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Models;
+using VHSmart_Api.Tests.Features.HalalApplication.CertificateItem;
+using VHSmart_Api.Tests.Features.HalalApplication.ManageBatch;
+using VHSmart_Api.Tests.Features.HalalApplication.MyApplication;
 
 namespace VHSmart_Api.Tests.Features.Premise.ManagePremise;
 
@@ -180,5 +184,59 @@ public class GetAllPremisesTests
         var untaggedRow = grid.Data.Single(row => row.Id == untaggedId);
         Assert.Null(untaggedRow.TagId);
         Assert.Equal(string.Empty, untaggedRow.TagName);
+    }
+
+    // PR-04: the seven Halal Information columns are the premise's NEWEST application
+    // (spec 7.7 [CONFIRMED] columns; newest-first is our rule), certificate columns
+    // following the exactly-one rule (Q17); no batch association -> all null.
+    [Fact]
+    public async Task Handle_HalalColumns_TakeTheNewestApplicationOfThePremise()
+    {
+        var user = PremiseTestData.CompanyUser();
+        var db = await PremiseTestData.CreateDbAsync(user);
+        var schemeId = await BatchTestData.FoodPremiseSchemeIdAsync(db);
+        var schemeName = await db.Schemes
+            .Where(row => row.Id == schemeId)
+            .Select(row => row.Name)
+            .SingleAsync();
+        var appliedId = await PremiseTestData.SeedPremiseAsync(
+            db, user.CompanyId, "Applied premise");
+        var bareId = await PremiseTestData.SeedPremiseAsync(
+            db, user.CompanyId, "Bare premise");
+        var batchId = await BatchTestData.SeedBatchAsync(
+            db, user.CompanyId, schemeId: schemeId, cbReferenceNo: "CB-99");
+        await BatchTestData.SeedBatchPremiseAsync(db, user.CompanyId, batchId, appliedId);
+        await ApplicationTestData.SeedApplicationAsync(
+            db, user.CompanyId,
+            referenceNo: "VHS-OLD", schemeId: schemeId, batchId: batchId,
+            status: ApplicationStatus.Draft, statusDate: new DateTime(2026, 1, 1));
+        var newestApplicationId = await ApplicationTestData.SeedApplicationAsync(
+            db, user.CompanyId,
+            referenceNo: "VHS-NEW", schemeId: schemeId, batchId: batchId,
+            status: ApplicationStatus.ApplicationApproved,
+            statusDate: new DateTime(2026, 4, 1));
+        await CertificateTestData.SeedCertificateAsync(
+            db, user.CompanyId, newestApplicationId,
+            certificateNo: "HAL-2026-0099", expiryDate: new DateOnly(2028, 1, 1));
+
+        var grid = await new GetAllPremisesHandler(db, user)
+            .Handle(new GetAllPremisesQuery(), CancellationToken.None);
+
+        var applied = grid.Data.Single(row => row.Id == appliedId);
+        Assert.Equal("VHS-NEW", applied.VhSmartReferenceNo);
+        Assert.Equal("CB-99", applied.CbReferenceNo);
+        Assert.Equal(schemeName, applied.Scheme);
+        Assert.Equal(ApplicationStatus.ApplicationApproved, applied.ApplicationStatus);
+        Assert.Equal("HAL-2026-0099", applied.HalalCertificateNo);
+        Assert.Equal(HalalStatus.Valid, applied.HalalCertificateStatus);
+        Assert.Equal(new DateOnly(2028, 1, 1), applied.HalalExpiryDate);
+        var bare = grid.Data.Single(row => row.Id == bareId);
+        Assert.Null(bare.VhSmartReferenceNo);
+        Assert.Null(bare.CbReferenceNo);
+        Assert.Null(bare.Scheme);
+        Assert.Null(bare.ApplicationStatus);
+        Assert.Null(bare.HalalCertificateNo);
+        Assert.Null(bare.HalalCertificateStatus);
+        Assert.Null(bare.HalalExpiryDate);
     }
 }

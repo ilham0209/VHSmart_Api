@@ -8,11 +8,11 @@ namespace VHSmart_Api.Controllers.Premise;
 
 // Premise > Manage Premise (spec 7.7): the Premise List (with the Premise Type filter), the
 // "View Premise / Edit Premise" modal (Premise Information, Staff Information, Facility
-// Information tabs), the Premise Attachment tab (list / upload / download - PDF only, D-22)
-// and Update Premise Tag - all on the Premise.ManagePremise screen key (CodingRules 8.2;
+// Information tabs), the Premise Attachment tab (list / upload / download - PDF only, D-22),
+// the read-only Halal / Menu / Product information tabs (PR-04) and Update Premise Tag - all
+// on the Premise.ManagePremise screen key (CodingRules 8.2;
 // legacy granules C1 view / C3 edit / C4 delete). The premise id appears in the route, never
-// a company id: the handlers scope every row to the caller's own company. The
-// Product/Menu/Halal tabs are separate endpoints added by PR-04.
+// a company id: the handlers scope every row to the caller's own company.
 [ApiController]
 [Route("api/premise/manage-premise")]
 [Authorize]
@@ -78,6 +78,67 @@ public class PremiseController(ISender sender) : ControllerBase
     {
         var response = await sender.Send(
             new GetPremiseAttachmentDocumentQuery(id, attachmentId), ct);
+        return File(response.Content, response.ContentType);
+    }
+
+    // Halal Information tab (spec 7.7): one row per application of this premise, newest
+    // first; the list above shows the newest one's columns.
+    [HttpGet("{id:guid}/halal-information")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
+    public async Task<IActionResult> GetHalalInformation(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(new GetPremiseHalalInformationQuery(id), ct));
+
+    // Menu/Product Information tabs (spec 7.7): Current and Approved are the same rows
+    // behind two endpoints rather than a query flag, so each action maps to one tab.
+    [HttpGet("{id:guid}/menu-information")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
+    public async Task<IActionResult> GetMenuInformation(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(
+            new GetPremiseMenuInformationQuery(id, Approved: false), ct));
+
+    [HttpGet("{id:guid}/approved-menu-information")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
+    public async Task<IActionResult> GetApprovedMenuInformation(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(
+            new GetPremiseMenuInformationQuery(id, Approved: true), ct));
+
+    [HttpGet("{id:guid}/product-information")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
+    public async Task<IActionResult> GetProductInformation(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(
+            new GetPremiseProductInformationQuery(id, Approved: false), ct));
+
+    [HttpGet("{id:guid}/approved-product-information")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
+    public async Task<IActionResult> GetApprovedProductInformation(Guid id, CancellationToken ct) =>
+        Ok(await sender.Send(
+            new GetPremiseProductInformationQuery(id, Approved: true), ct));
+
+    // "Download Halal Certificate" of the Menu/Product tab rows: the raw material's stored
+    // HALAL CERTIFICATE file, validated against the premise's own tab scope (404 otherwise).
+    [HttpGet("{id:guid}/menu-information/{menuId:guid}/certificate/{rawMaterialId:guid}")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
+    public async Task<IActionResult> GetMenuCertificate(
+        Guid id,
+        Guid menuId,
+        Guid rawMaterialId,
+        CancellationToken ct)
+    {
+        var response = await sender.Send(
+            new GetPremiseMenuCertificateQuery(id, menuId, rawMaterialId), ct);
+        return File(response.Content, response.ContentType);
+    }
+
+    [HttpGet("{id:guid}/product-information/{productId:guid}/certificate/{rawMaterialId:guid}")]
+    [HasPermission(PermissionKeys.PremiseManagePremise, PermissionAction.View)]
+    public async Task<IActionResult> GetProductCertificate(
+        Guid id,
+        Guid productId,
+        Guid rawMaterialId,
+        CancellationToken ct)
+    {
+        var response = await sender.Send(
+            new GetPremiseProductCertificateQuery(id, productId, rawMaterialId), ct);
         return File(response.Content, response.ContentType);
     }
 

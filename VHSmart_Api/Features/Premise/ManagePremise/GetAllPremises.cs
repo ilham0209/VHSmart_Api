@@ -16,7 +16,12 @@ namespace VHSmart_Api.Features.Premise.ManagePremise;
 // extra query over the page's attachments feeding the pure calculator, never a stored column
 // (Database.md: "Document Status is computed, not stored"). Tag is the premise's TagId plus
 // the Premise Tag General Data name for the Tag link (spec 7.7; null name = "CLICK TO ADD"
-// placeholder on the client). Halal Information arrives with PR-04/HA. The "Premise Type"
+// placeholder on the client). The seven Halal Information columns (spec 7.7 [CONFIRMED]) are
+// the premise's NEWEST application - the spec shows the columns as single cells while
+// Advanced Search (spec 8) shows the full numbered list, so the list takes StatusDate
+// descending, ties by Id (ours, flagged) - loaded after paging by PremiseHalalInfoLoader
+// with its certificate columns following the exactly-one rule (Q17); a premise never
+// associated to a batch leaves them all null. The "Premise Type"
 // toolbar filter (ALL / specific) binds as a nullable enum: null = ALL. Search covers the
 // visible Premise Information columns; the spec states no default order, so StoreName
 // ascending is used (flagged in the report). The explicit CompanyId match keeps a ViewAll
@@ -37,6 +42,13 @@ public record GetAllPremisesResponse(
     string Country,
     string Telephone,
     string Email,
+    string? VhSmartReferenceNo,
+    string? CbReferenceNo,
+    string? Scheme,
+    string? ApplicationStatus,
+    string? HalalCertificateNo,
+    HalalStatus? HalalCertificateStatus,
+    DateOnly? HalalExpiryDate,
     string AreaManager,
     string OperationManager,
     string Brand,
@@ -75,6 +87,13 @@ public class GetAllPremisesHandler(VHSmartDbContext db, ICurrentUser user)
                      select country.Name).FirstOrDefault() ?? string.Empty,
                     premise.Telephone,
                     premise.Email,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
                     (from staff in db.Staffs
                      where staff.Id == premise.AreaManagerStaffId
                      select staff.Name).FirstOrDefault() ?? string.Empty,
@@ -101,11 +120,14 @@ public class GetAllPremisesHandler(VHSmartDbContext db, ICurrentUser user)
             .ToDataGridResponseAsync(request.Request, ct);
 
         // Document Status is computed over the page (the calculator is pure and needs the
-        // whole required-type set per premise), never stored and never filtered on here.
+        // whole required-type set per premise), never stored and never filtered on here;
+        // the Halal Information columns are the newest application's join, loaded the same
+        // way so neither takes part in the search or the sort.
         List<Guid> pageIds = [.. grid.Data.Select(row => row.Id)];
         if (pageIds.Count == 0)
             return grid;
 
+        var halalByPremise = await PremiseHalalInfoLoader.LoadAsync(db, user, pageIds, ct);
         var attachments = await db.PremiseAttachments.AsNoTracking()
             .Where(row => pageIds.Contains(row.PremiseId))
             .ToListAsync(ct);
@@ -122,11 +144,24 @@ public class GetAllPremisesHandler(VHSmartDbContext db, ICurrentUser user)
                             row.ExpiryDate is null ? null : DateOnly.FromDateTime(row.ExpiryDate.Value))))
                     .ToList());
         var today = PremiseDocumentClock.Today();
-        grid.Data = [.. grid.Data.Select(row => row with
+        grid.Data = [.. grid.Data.Select(row =>
         {
-            DocumentStatus = PremiseDocumentStatusCalculator.Calculate(
-                documentsByPremise.TryGetValue(row.Id, out var documents) ? documents : [],
-                today).Text
+            var latestApplication = halalByPremise.TryGetValue(row.Id, out var applications)
+                ? applications.FirstOrDefault()
+                : null;
+            return row with
+            {
+                DocumentStatus = PremiseDocumentStatusCalculator.Calculate(
+                    documentsByPremise.TryGetValue(row.Id, out var documents) ? documents : [],
+                    today).Text,
+                VhSmartReferenceNo = latestApplication?.VhSmartReferenceNo,
+                CbReferenceNo = latestApplication?.CbReferenceNo,
+                Scheme = latestApplication?.Scheme,
+                ApplicationStatus = latestApplication?.ApplicationStatus,
+                HalalCertificateNo = latestApplication?.HalalCertificateNo,
+                HalalCertificateStatus = latestApplication?.HalalCertificateStatus,
+                HalalExpiryDate = latestApplication?.HalalExpiryDate
+            };
         })];
 
         return grid;

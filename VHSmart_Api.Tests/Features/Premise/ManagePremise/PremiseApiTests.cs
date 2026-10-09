@@ -617,4 +617,84 @@ public class PremiseApiTests
         Assert.Equal(5, error.RowNumber);
         Assert.Equal("Company not found.", error.Message);
     }
+
+    // PR-04 tab endpoints (spec 7.7): five read-only list routes + two certificate
+    // downloads, all on the Premise.ManagePremise View action.
+    private static readonly string[] TabPaths =
+    [
+        "halal-information",
+        "menu-information",
+        "approved-menu-information",
+        "product-information",
+        "approved-product-information"
+    ];
+
+    [Fact]
+    public async Task Tabs_PremiseWithoutData_ReturnOkAndEmpty()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        foreach (var path in TabPaths)
+        {
+            var response = await client.GetAsync($"{Route}/{premiseId}/{path}");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        var halal = await client.GetFromJsonAsync<IReadOnlyList<PremiseHalalInfoRow>>(
+            $"{Route}/{premiseId}/halal-information", Json);
+        var menus = await client.GetFromJsonAsync<IReadOnlyList<PremiseMenuInformationRow>>(
+            $"{Route}/{premiseId}/menu-information", Json);
+        var products = await client.GetFromJsonAsync<IReadOnlyList<PremiseProductInformationRow>>(
+            $"{Route}/{premiseId}/product-information", Json);
+        Assert.Empty(halal!);
+        Assert.Empty(menus!);
+        Assert.Empty(products!);
+    }
+
+    [Fact]
+    public async Task Tabs_UnknownPremise_ReturnNotFound()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        foreach (var path in TabPaths)
+        {
+            var response = await client.GetAsync($"{Route}/{Guid.NewGuid()}/{path}");
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task HalalInformation_WithoutViewPermission_ReturnsForbidden()
+    {
+        using var factory = new PremiseApiFactory(grantView: false);
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{premiseId}/halal-information");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TabCertificates_UnknownIds_ReturnNotFound()
+    {
+        using var factory = new PremiseApiFactory();
+        await factory.SeedDatabaseAsync();
+        var premiseId = await factory.SeedPremiseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var menu = await client.GetAsync(
+            $"{Route}/{premiseId}/menu-information/{Guid.NewGuid()}/certificate/{Guid.NewGuid()}");
+        var product = await client.GetAsync(
+            $"{Route}/{premiseId}/product-information/{Guid.NewGuid()}/certificate/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.NotFound, menu.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, product.StatusCode);
+    }
 }

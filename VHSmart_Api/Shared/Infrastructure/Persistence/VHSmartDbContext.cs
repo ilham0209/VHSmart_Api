@@ -44,6 +44,13 @@ public class VHSmartDbContext(
     public DbSet<AuditCriteriaFindingEntity> AuditCriteriaFindings =>
         Set<AuditCriteriaFindingEntity>();
 
+    public DbSet<AuditChecklistEntity> AuditChecklists => Set<AuditChecklistEntity>();
+
+    public DbSet<AuditChecklistCriteriaEntity> AuditChecklistCriteria =>
+        Set<AuditChecklistCriteriaEntity>();
+
+    public DbSet<AuditPlanEntity> AuditPlans => Set<AuditPlanEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -359,6 +366,112 @@ public class VHSmartDbContext(
                 .OnDelete(DeleteBehavior.Restrict);
             // NO unique pair: Database.md 11 states "UQ pair" for the other junctions but
             // not for this one - duplicates are collapsed in the handler instead (flagged).
+        });
+
+        modelBuilder.Entity<AuditChecklistEntity>(entity =>
+        {
+            entity.ToTable("AudAuditChecklists");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ChecklistCategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ChecklistCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // NO unique on Name: Database.md 12 states none (spec 14.6 shows "checklist
+            // syariah 2.0" style duplicates as ordinary rows).
+        });
+
+        modelBuilder.Entity<AuditChecklistCriteriaEntity>(entity =>
+        {
+            entity.ToTable("AudAuditChecklistCriteria");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ChecklistId);
+            entity.HasOne<AuditChecklistEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ChecklistId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AuditCriteriaId);
+            entity.HasOne<AuditCriteriaEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AuditCriteriaId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Database.md 12 "UQ pair" - filtered like every other junction so an
+            // un-tick frees the pair for re-ticking.
+            entity.HasIndex(x => new { x.CompanyId, x.ChecklistId, x.AuditCriteriaId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<AuditPlanEntity>(entity =>
+        {
+            // Modelled for the spec 14.6 lock read only (full documented column set,
+            // Database.md 13); Audit Planning behaviour is a later task (flagged).
+            entity.ToTable("AudAuditPlans");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.AuditReferenceNo).IsRequired().HasMaxLength(120);
+            // Database.md 13 types both as date.
+            entity.Property(x => x.ScheduleDate).HasColumnType("date");
+            entity.Property(x => x.DateAssigned).HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ AuditReferenceNo (Database.md 13), company-scoped filtered the house way
+            // (the prefix lives per company/brand, so references never cross companies).
+            entity.HasIndex(x => new { x.CompanyId, x.AuditReferenceNo })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            entity.HasIndex(x => x.AuditPurposeId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AuditPurposeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AuditTypeId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AuditTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<PremiseEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ChecklistId);
+            entity.HasOne<AuditChecklistEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ChecklistId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AssignedByUserId);
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AssignedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // GroupAuditorId: plain column - AudGroupAuditors is not part of the model
+            // yet, so its FK constraint is deferred to the Group Auditor task (flagged).
         });
 
         modelBuilder.Entity<CertificationBodyEntity>(entity =>

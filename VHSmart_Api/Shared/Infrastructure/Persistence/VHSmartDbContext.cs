@@ -31,6 +31,11 @@ public class VHSmartDbContext(
 
     public DbSet<RecommendationEntity> Recommendations => Set<RecommendationEntity>();
 
+    public DbSet<FindingEntity> Findings => Set<FindingEntity>();
+
+    public DbSet<FindingRecommendationEntity> FindingRecommendations =>
+        Set<FindingRecommendationEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -209,6 +214,59 @@ public class VHSmartDbContext(
                 .OnDelete(DeleteBehavior.Restrict);
             // No unique rule for recommendations (Database.md 14.3 "Free-text code"): the
             // spec states none and codes look free (spec 14.3 samples).
+        });
+
+        modelBuilder.Entity<FindingEntity>(entity =>
+        {
+            entity.ToTable("AudFindings");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(2000);
+            entity.Property(x => x.FindingCode).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, FindingCode) among live rows (Database.md 11): a soft delete
+            // frees the code. The handler returns 409 with a friendly message instead of
+            // letting this fire on a race.
+            entity.HasIndex(x => new { x.CompanyId, x.FindingCode })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            // Spec 21.9 claims the description is unique too, but Database.md 11 carries no
+            // such index and its conventions express unique rules as filtered indexes -
+            // description uniqueness is not enforced (flagged in AU-03 report).
+        });
+
+        modelBuilder.Entity<FindingRecommendationEntity>(entity =>
+        {
+            entity.ToTable("AudFindingRecommendations");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // No navigation properties: the links are always read through the two id columns
+            // (GetAllFindings joins, Create/Update/Delete manage the rows directly).
+            entity.HasIndex(x => x.FindingId);
+            entity.HasOne<FindingEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.FindingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.RecommendationId);
+            entity.HasOne<RecommendationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.RecommendationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.FindingId, x.RecommendationId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
         });
 
         modelBuilder.Entity<CertificationBodyEntity>(entity =>

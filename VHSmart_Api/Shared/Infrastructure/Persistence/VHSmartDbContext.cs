@@ -83,6 +83,11 @@ public class VHSmartDbContext(
 
     public DbSet<BatchPremiseEntity> BatchPremises => Set<BatchPremiseEntity>();
 
+    public DbSet<ApplicationEntity> Applications => Set<ApplicationEntity>();
+
+    public DbSet<ApplicationStatusHistoryEntity> ApplicationStatusHistories =>
+        Set<ApplicationStatusHistoryEntity>();
+
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
 
@@ -1101,6 +1106,63 @@ public class VHSmartDbContext(
             entity.HasIndex(x => new { x.BatchId, x.PremiseId })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<ApplicationEntity>(entity =>
+        {
+            entity.ToTable("AppHalalApplications");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ReferenceNo).IsRequired().HasMaxLength(60);
+            entity.Property(x => x.ApplicationType).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(60);
+            entity.Property(x => x.CbApplicationNo).HasMaxLength(100);
+            entity.Property(x => x.HalalCoachName).HasMaxLength(200);
+            entity.Property(x => x.YearlySalesRevenue).HasMaxLength(100);
+            entity.Property(x => x.ProductMarket).HasMaxLength(20);
+            entity.Property(x => x.AckName).HasMaxLength(200);
+            entity.Property(x => x.AckEmail).HasMaxLength(254);
+            entity.Property(x => x.AckMobile).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BatchId);
+            entity.HasOne<BatchEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ ReferenceNo (Database.md 10): the D-09 generator hands out one number per
+            // prefix + scheme + date, so a collision means a bug, not a user mistake.
+            entity.HasIndex(x => x.ReferenceNo).IsUnique();
+        });
+
+        modelBuilder.Entity<ApplicationStatusHistoryEntity>(entity =>
+        {
+            entity.ToTable("AppApplicationStatusHistories");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FromStatus).HasMaxLength(60);
+            entity.Property(x => x.ToStatus).IsRequired().HasMaxLength(60);
+            entity.Property(x => x.Remarks).HasMaxLength(500);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

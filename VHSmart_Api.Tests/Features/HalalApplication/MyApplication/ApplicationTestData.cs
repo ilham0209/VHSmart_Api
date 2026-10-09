@@ -117,4 +117,25 @@ internal static class ApplicationTestData
     // build it so both features see the same batch shape.
     public static Task<Guid> SeedBatchAsync(TestableVHSmartDbContext db, Guid companyId) =>
         BatchTestData.SeedBatchAsync(db, companyId, name: "Santan Batch Pertama");
+
+    // A stored Additional Information row (the tab reads whatever is in the table, so the
+    // read test inserts directly and the save test builds its own).
+    public static async Task SeedAdditionalInfoItemAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId,
+        Guid applicationId,
+        ApplicationAdditionalInfoSection section,
+        string optionCode,
+        string? freeText = null)
+    {
+        db.ApplicationAdditionalInfoItems.Add(new ApplicationAdditionalInfoItemEntity
+        {
+            CompanyId = companyId,
+            ApplicationId = applicationId,
+            Section = section,
+            OptionCode = optionCode,
+            FreeText = freeText
+        });
+        await db.SaveChangesAsync();
+    }
 }

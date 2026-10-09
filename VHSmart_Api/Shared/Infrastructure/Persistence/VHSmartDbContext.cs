@@ -88,6 +88,9 @@ public class VHSmartDbContext(
     public DbSet<ApplicationStatusHistoryEntity> ApplicationStatusHistories =>
         Set<ApplicationStatusHistoryEntity>();
 
+    public DbSet<ApplicationAdditionalInfoItemEntity> ApplicationAdditionalInfoItems =>
+        Set<ApplicationAdditionalInfoItemEntity>();
+
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
 
@@ -1151,6 +1154,29 @@ public class VHSmartDbContext(
             entity.Property(x => x.FromStatus).HasMaxLength(60);
             entity.Property(x => x.ToStatus).IsRequired().HasMaxLength(60);
             entity.Property(x => x.Remarks).HasMaxLength(500);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ApplicationAdditionalInfoItemEntity>(entity =>
+        {
+            entity.ToTable("AppApplicationAdditionalInfoItems");
+            entity.HasKey(x => x.Id);
+            // Section is an enum stored as string (Database.md "Enums"); the widest value
+            // today is "QualityControl".
+            entity.Property(x => x.Section).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.OptionCode).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.FreeText).HasMaxLength(500);
             entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
             entity.Property(x => x.SysUserModified).HasMaxLength(100);
             entity.HasIndex(x => x.CompanyId);

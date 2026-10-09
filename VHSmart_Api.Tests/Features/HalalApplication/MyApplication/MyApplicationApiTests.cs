@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Mvc;
 using VHSmart_Api.Features.HalalApplication.MyApplication;
+using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 using VHSmart_Api.Shared.Infrastructure.Security;
 using VHSmart_Api.Shared.Models;
@@ -214,5 +215,294 @@ public class MyApplicationApiTests
         Assert.Equal(9, payload.Length);
         Assert.Equal("PR", payload[0].Code);
         Assert.Contains(payload, scheme => scheme.Code == null);
+    }
+
+    [Fact]
+    public async Task GetById_WithPermission_ReturnsTheScreen()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync("Sereni Trading Sdn Bhd");
+        var applicationId = await factory.SeedApplicationAsync("VHS(PR)/01012026/7");
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{applicationId}");
+        var payload = await ReadAsync<ApplicationDetailResponse>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal(applicationId, payload.Id);
+        Assert.Equal("VHS(PR)/01012026/7", payload.ReferenceNo);
+        Assert.Equal("Sereni Trading Sdn Bhd", payload.CompanyName);
+        Assert.Equal("DRAFT", payload.Status);
+        Assert.True(payload.Survey.ReadProcedureManual);
+        Assert.NotNull(payload.Company);
+        Assert.NotNull(payload.Extras);
+        Assert.Empty(payload.AdditionalInformation);
+    }
+
+    [Fact]
+    public async Task GetById_UnknownId_ReturnsNotFound()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{Guid.NewGuid()}");
+        var problem = await ReadAsync<ProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Equal("Application not found.", problem.Detail);
+    }
+
+    [Fact]
+    public async Task Update_ViewOnlyRole_ReturnsForbidden()
+    {
+        using var factory = new MyApplicationApiFactory(
+            AdminRoleId, grantedActions: [PermissionAction.View]);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}",
+            new UpdateApplicationCommand(
+                Guid.Empty, "Renewal", null, null, null, null),
+            Json);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Update_ValidCommand_ReturnsTheHeader()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}",
+            new UpdateApplicationCommand(
+                Guid.Empty,
+                "renewal",
+                "CB-2026-001",
+                new DateOnly(2026, 10, 1),
+                "Coach Rahim",
+                null),
+            Json);
+        var payload = await ReadAsync<ApplicationHeaderResponse>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal(applicationId, payload.Id);
+        // The route id wins over whatever the body carried (the same stance as UpdateBatch).
+        Assert.Equal("Renewal", payload.ApplicationType);
+        Assert.Equal("CB-2026-001", payload.CbApplicationNo);
+        Assert.Equal("Coach Rahim", payload.HalalCoachName);
+        Assert.Null(payload.BatchName);
+    }
+
+    [Fact]
+    public async Task Update_UnknownId_ReturnsNotFound()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{Guid.NewGuid()}",
+            new UpdateApplicationCommand(
+                Guid.Empty, "New", null, null, null, null),
+            Json);
+        var problem = await ReadAsync<ProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("Application not found.", problem?.Detail);
+    }
+
+    [Fact]
+    public async Task UpdateCompanyInformation_ValidCommand_ReturnsTheExtras()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/company-information",
+            new UpdateCompanyInformationCommand(
+                Guid.Empty,
+                YearlySalesRevenue: "2500000",
+                ProductMarket: "Domestic",
+                WorkingHourFrom: new TimeOnly(8, 0),
+                WorkingHourTo: new TimeOnly(17, 0),
+                NumberOfShifts: 2,
+                MuslimManagement: 4,
+                MuslimFoodHandler: 10,
+                MuslimChef: 3,
+                NonMuslimManagement: 1,
+                NonMuslimFoodHandler: 6,
+                NonMuslimChef: 2),
+            Json);
+        var payload = await ReadAsync<ApplicationCompanyExtrasResponse>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal("2500000", payload.YearlySalesRevenue);
+        Assert.Equal("Domestic", payload.ProductMarket);
+        Assert.Equal(2, payload.NumberOfShifts);
+    }
+
+    [Fact]
+    public async Task UpdateCompanyInformation_NegativeCounter_Returns400()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/company-information",
+            new UpdateCompanyInformationCommand(
+                Guid.Empty, null, null, null, null,
+                NumberOfShifts: -1,
+                null, null, null, null, null, null),
+            Json);
+        var problem = await ReadAsync<ValidationProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Contains(
+            "Employee counts and number of shifts must be 0 or more.",
+            problem.Errors.Values.SelectMany(value => value));
+    }
+
+    [Fact]
+    public async Task UpdateAdditionalInformation_ValidCommand_ReturnsTheItems()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/additional-information",
+            new UpdateAdditionalInformationCommand(
+                applicationId,
+                [
+                    new AdditionalInfoItemInput(
+                        ApplicationAdditionalInfoSection.Packaging, "CARTON_BOX", null),
+                    new AdditionalInfoItemInput(
+                        ApplicationAdditionalInfoSection.QualityControl, "OTHERS",
+                        "Third party audit")
+                ]),
+            Json);
+        var payload = await ReadAsync<ApplicationAdditionalInfoItemResponse[]>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload.Length);
+        Assert.Equal("CARTON_BOX", payload[0].OptionCode);
+        Assert.Equal("OTHERS", payload[1].OptionCode);
+        Assert.Equal("Third party audit", payload[1].FreeText);
+        // Enum round-trips as its string name (JsonStringEnumConverter).
+        Assert.Equal("Packaging", payload[0].Section.ToString());
+    }
+
+    [Fact]
+    public async Task UpdateAdditionalInformation_UnknownOption_Returns400()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.PutAsJsonAsync(
+            $"{Route}/{applicationId}/additional-information",
+            new UpdateAdditionalInformationCommand(
+                applicationId,
+                [
+                    new AdditionalInfoItemInput(
+                        ApplicationAdditionalInfoSection.Packaging, "WOODEN_CRATE", null)
+                ]),
+            Json);
+        var problem = await ReadAsync<ValidationProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.NotNull(problem);
+        Assert.Contains(
+            "Additional information option is not valid for its section.",
+            problem.Errors.Values.SelectMany(value => value));
+    }
+
+    [Fact]
+    public async Task GetEstablishments_WithoutBatch_ReturnsAnEmptyArray()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{applicationId}/establishments");
+        var payload = await ReadAsync<ApplicationEstablishmentResponse[]>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Empty(payload);
+    }
+
+    [Fact]
+    public async Task GetProducts_WithoutBatch_ReturnsAnEmptyArray()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{applicationId}/products");
+        var payload = await ReadAsync<ApplicationProductResponse[]>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Empty(payload);
+    }
+
+    [Fact]
+    public async Task GetRawMaterials_WithoutBatch_ReturnsAnEmptyArray()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        await factory.SeedCompanyAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory);
+
+        var response = await client.GetAsync($"{Route}/{applicationId}/raw-materials");
+        var payload = await ReadAsync<ApplicationRawMaterialResponse[]>(response);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(payload);
+        Assert.Empty(payload);
+    }
+
+    [Fact]
+    public async Task GetById_ForeignApplicationToken_ReturnsNotFound()
+    {
+        using var factory = new MyApplicationApiFactory(AdminRoleId);
+        await factory.SeedDatabaseAsync();
+        var applicationId = await factory.SeedApplicationAsync();
+        using var client = CreateAuthorizedClient(factory, companyId: Guid.NewGuid());
+
+        var response = await client.GetAsync($"{Route}/{applicationId}");
+        var problem = await ReadAsync<ProblemDetails>(response);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("Application not found.", problem?.Detail);
     }
 }

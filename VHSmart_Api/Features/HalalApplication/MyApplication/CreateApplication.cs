@@ -99,7 +99,7 @@ public class CreateApplicationHandler(
         {
             CompanyId = user.CompanyId,
             ReferenceNo = referenceNo,
-            ApplicationType = NormalizeApplicationType(request.ApplicationType),
+            ApplicationType = ApplicationData.NormalizeApplicationType(request.ApplicationType),
             Status = ApplicationStatus.Draft,
             StatusDate = now,
             SchemeId = request.SchemeId,
@@ -139,12 +139,4 @@ public class CreateApplicationHandler(
             entity.SurveyHandlesProhibited,
             entity.SurveyHasIhc);
     }
-
-    // Canonical Database.md 10 casing ("New", "Renewal") whatever casing the picker sent.
-    private static string NormalizeApplicationType(string? applicationType) =>
-        string.IsNullOrWhiteSpace(applicationType)
-            ? "New"
-            : string.Equals(applicationType, "Renewal", StringComparison.OrdinalIgnoreCase)
-                ? "Renewal"
-                : "New";
 }

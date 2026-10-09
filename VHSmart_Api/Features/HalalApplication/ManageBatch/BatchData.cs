@@ -44,15 +44,17 @@ internal static class BatchData
     // D-15: only premises whose five required document types are uploaded and none expired
     // ("COMPLETE DOCUMENTATION") may join a batch - the Batch > Associate Premise pick-list
     // rule. The calculator is pure, so the attachments are loaded once and the caller passes
-    // the ids it cares about (the picker passes the caller's own premises, the link guard one).
-    public static async Task<HashSet<Guid>> LoadCompletePremiseIdsAsync(
+    // the ids it cares about (the picker passes the caller's own premises, the link guard
+    // one). LoadPremiseStatusesAsync is the same computation returning the status text the
+    // application screen's Establishment tab shows (HA-03).
+    public static async Task<Dictionary<Guid, PremiseDocumentStatus>> LoadPremiseStatusesAsync(
         VHSmartDbContext db,
         IReadOnlyCollection<Guid> premiseIds,
         CancellationToken ct)
     {
-        var complete = new HashSet<Guid>();
+        var statuses = new Dictionary<Guid, PremiseDocumentStatus>();
         if (premiseIds.Count == 0)
-            return complete;
+            return statuses;
 
         var attachments = await db.PremiseAttachments.AsNoTracking()
             .Where(row => premiseIds.Contains(row.PremiseId))
@@ -75,14 +77,23 @@ internal static class BatchData
         var today = PremiseDocumentClock.Today();
         foreach (var premiseId in premiseIds.Distinct())
         {
-            var status = PremiseDocumentStatusCalculator.Calculate(
+            statuses[premiseId] = PremiseDocumentStatusCalculator.Calculate(
                 documentsByPremise.TryGetValue(premiseId, out var documents) ? documents : [],
                 today);
-            if (status.IsComplete)
-                complete.Add(premiseId);
         }
 
-        return complete;
+        return statuses;
+    }
+
+    public static async Task<HashSet<Guid>> LoadCompletePremiseIdsAsync(
+        VHSmartDbContext db,
+        IReadOnlyCollection<Guid> premiseIds,
+        CancellationToken ct)
+    {
+        var statuses = await LoadPremiseStatusesAsync(db, premiseIds, ct);
+        return [.. statuses
+            .Where(pair => pair.Value.IsComplete)
+            .Select(pair => pair.Key)];
     }
 }
 

@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using VHSmart_Api.Shared.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using VHSmart_Api.Shared.Infrastructure.Persistence;
 namespace VHSmart_Api.Shared.Infrastructure.Migrations
 {
     [DbContext(typeof(VHSmartDbContext))]
-    partial class VHSmartDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261009044947_AppApplicationAttachments")]
+    partial class AppApplicationAttachments
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -5789,124 +5792,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AppBatchProducts", (string)null);
                 });
 
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.HalalApplication.CertificateItemEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("BrandId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("HalalCertificateId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("ItemName")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("nvarchar(300)");
-
-                    b.Property<Guid?>("PremiseId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("ProductId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationId");
-
-                    b.HasIndex("BrandId");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("HalalCertificateId");
-
-                    b.HasIndex("PremiseId");
-
-                    b.HasIndex("ProductId");
-
-                    b.ToTable("AppCertificateItems", (string)null);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.HalalApplication.HalalCertificateEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ApplicationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("CertificateNo")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateOnly?>("ExpiryDate")
-                        .HasColumnType("date");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateOnly?>("IssuedDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime>("SysDateCreated")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime?>("SysDateModified")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("SysUserCreated")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.Property<string>("SysUserModified")
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ApplicationId");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("CompanyId", "CertificateNo")
-                        .IsUnique()
-                        .HasFilter("[IsDeleted] = 0");
-
-                    b.ToTable("AppHalalCertificates", (string)null);
-                });
-
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuAccessibleCompanyEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7634,89 +7519,6 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.HalalApplication.CertificateItemEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.HalalApplication.ApplicationEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
-                        .WithMany()
-                        .HasForeignKey("BrandId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.HalalApplication.HalalCertificateEntity", null)
-                        .WithMany()
-                        .HasForeignKey("HalalCertificateId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.PremiseEntity", null)
-                        .WithMany()
-                        .HasForeignKey("PremiseId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Product.ProductEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
-            modelBuilder.Entity("VHSmart_Api.Shared.Domain.HalalApplication.HalalCertificateEntity", b =>
-                {
-                    b.HasOne("VHSmart_Api.Shared.Domain.HalalApplication.ApplicationEntity", null)
-                        .WithMany()
-                        .HasForeignKey("ApplicationId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Document", b1 =>
-                        {
-                            b1.Property<Guid>("HalalCertificateEntityId")
-                                .HasColumnType("uniqueidentifier");
-
-                            b1.Property<string>("ContentType")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.Property<string>("FileName")
-                                .IsRequired()
-                                .HasMaxLength(260)
-                                .HasColumnType("nvarchar(260)");
-
-                            b1.Property<long>("SizeBytes")
-                                .HasColumnType("bigint");
-
-                            b1.Property<string>("StorageKey")
-                                .IsRequired()
-                                .HasMaxLength(100)
-                                .HasColumnType("nvarchar(100)");
-
-                            b1.HasKey("HalalCertificateEntityId");
-
-                            b1.ToTable("AppHalalCertificates");
-
-                            b1.WithOwner()
-                                .HasForeignKey("HalalCertificateEntityId");
-                        });
-
-                    b.Navigation("Document");
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuAccessibleCompanyEntity", b =>

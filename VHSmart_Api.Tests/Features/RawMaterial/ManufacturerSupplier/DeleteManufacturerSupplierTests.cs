@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.RawMaterial.ManufacturerSupplier;
+using VHSmart_Api.Shared.Domain.HalalApplication;
+using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Exceptions;
 
@@ -120,5 +122,64 @@ public class DeleteManufacturerSupplierTests
         await Assert.ThrowsAsync<NotFoundException>(() =>
             new DeleteManufacturerSupplierHandler(db)
                 .Handle(new DeleteManufacturerSupplierCommand(row.Id), CancellationToken.None));
+    }
+
+    // The PrdProducts and AppBatches parts RM-01 deferred to PD-01 / HA-01, landed here.
+    [Fact]
+    public async Task Handle_RowUsedByAProduct_ThrowsBusinessRule()
+    {
+        var db = await CreateDbAsync(new TestCurrentUser(Guid.NewGuid().ToString(), CompanyA));
+        var row = NewRow(CompanyA, "manufacturer@example.com");
+        db.ManufacturerSuppliers.Add(row);
+        var schemeId = await db.Schemes.AsNoTracking()
+            .OrderBy(scheme => scheme.SortOrder)
+            .Select(scheme => scheme.Id)
+            .FirstAsync();
+        db.Products.Add(new ProductEntity
+        {
+            CompanyId = CompanyA,
+            SchemeId = schemeId,
+            Name = "Santan Kicap",
+            Code = "PRD-001",
+            ManufacturerSupplierId = row.Id
+        });
+        await db.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            new DeleteManufacturerSupplierHandler(db)
+                .Handle(new DeleteManufacturerSupplierCommand(row.Id), CancellationToken.None));
+
+        Assert.Equal(
+            "This manufacturer and supplier is used by a product.", exception.Message);
+        Assert.False(
+            (await db.ManufacturerSuppliers.IgnoreQueryFilters().SingleAsync()).IsDeleted);
+    }
+
+    [Fact]
+    public async Task Handle_RowUsedByABatch_ThrowsBusinessRule()
+    {
+        var db = await CreateDbAsync(new TestCurrentUser(Guid.NewGuid().ToString(), CompanyA));
+        var row = NewRow(CompanyA, "manufacturer@example.com");
+        db.ManufacturerSuppliers.Add(row);
+        var schemeId = await db.Schemes.AsNoTracking()
+            .OrderBy(scheme => scheme.SortOrder)
+            .Select(scheme => scheme.Id)
+            .FirstAsync();
+        db.Batches.Add(new BatchEntity
+        {
+            CompanyId = CompanyA,
+            SchemeId = schemeId,
+            Name = "Santan Batch Pertama",
+            ManufacturerSupplierId = row.Id
+        });
+        await db.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            new DeleteManufacturerSupplierHandler(db)
+                .Handle(new DeleteManufacturerSupplierCommand(row.Id), CancellationToken.None));
+
+        Assert.Equal("This manufacturer and supplier is used by a batch.", exception.Message);
+        Assert.False(
+            (await db.ManufacturerSuppliers.IgnoreQueryFilters().SingleAsync()).IsDeleted);
     }
 }

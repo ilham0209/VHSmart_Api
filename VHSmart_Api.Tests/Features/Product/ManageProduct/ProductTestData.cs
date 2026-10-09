@@ -3,6 +3,7 @@ using VHSmart_Api.Features.Product.ManageProduct;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
+using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 
@@ -249,6 +250,37 @@ internal static class ProductTestData
         db.RawMaterialAttachments.Add(row);
         await db.SaveChangesAsync();
         return row.Id;
+    }
+
+    // A live AppBatchProducts row (HA-01): the delete guards must refuse to free a product a
+    // batch still holds. softDeleteLink = true seeds the already-unlinked row that CodingRules
+    // 7.2 lets through (only LIVE referencing rows block).
+    public static async Task<Guid> SeedBatchProductLinkAsync(
+        TestableVHSmartDbContext db,
+        Guid productId,
+        Guid? companyId = null,
+        bool softDeleteLink = false)
+    {
+        var batch = new BatchEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            SchemeId = await FirstSchemeIdAsync(db),
+            Name = $"Batch {Guid.NewGuid():N}"
+        };
+        db.Batches.Add(batch);
+        await db.SaveChangesAsync();
+
+        var link = new BatchProductEntity
+        {
+            CompanyId = companyId ?? CompanyA,
+            BatchId = batch.Id,
+            ProductId = productId,
+            MappingStatus = BatchProductMappingStatus.Active,
+            IsDeleted = softDeleteLink
+        };
+        db.BatchProducts.Add(link);
+        await db.SaveChangesAsync();
+        return link.Id;
     }
 
     // A row of the image table (Database.md 9): isCurrent = false marks the superseded version

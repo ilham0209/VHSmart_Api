@@ -92,4 +92,27 @@ public class BulkDeleteProductsTests
             empty.Errors,
             failure => failure.ErrorMessage == "No rows selected.");
     }
+
+    // The toolbar runs the same in-use guard as the row delete (HA-01, PD-01 flag), and the
+    // batch stays all-or-nothing: the free row is NOT half-deleted.
+    [Fact]
+    public async Task Handle_OneRowUsedByABatch_ThrowsBusinessRuleAndDeletesNothing()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var free = await SeedProductAsync(db, code: "PRD-001");
+        var held = await SeedProductAsync(db, name: "Santan Sos", code: "PRD-002");
+        await SeedBatchProductLinkAsync(db, held);
+
+        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            new BulkDeleteProductsHandler(db, user)
+                .Handle(
+                    new BulkDeleteProductsCommand([free, held]),
+                    CancellationToken.None));
+
+        Assert.Equal("This product is used by a batch.", exception.Message);
+        Assert.Equal(
+            0,
+            await db.Products.IgnoreQueryFilters().CountAsync(row => row.IsDeleted));
+    }
 }

@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
+using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Infrastructure.Security;
@@ -75,6 +76,29 @@ public class VHSmartDbContext(
     public DbSet<ProductIngredientEntity> ProductIngredients => Set<ProductIngredientEntity>();
 
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
+
+    public DbSet<BatchEntity> Batches => Set<BatchEntity>();
+
+    public DbSet<BatchProductEntity> BatchProducts => Set<BatchProductEntity>();
+
+    public DbSet<BatchPremiseEntity> BatchPremises => Set<BatchPremiseEntity>();
+
+    public DbSet<ApplicationEntity> Applications => Set<ApplicationEntity>();
+
+    public DbSet<ApplicationStatusHistoryEntity> ApplicationStatusHistories =>
+        Set<ApplicationStatusHistoryEntity>();
+
+    public DbSet<ApplicationAdditionalInfoItemEntity> ApplicationAdditionalInfoItems =>
+        Set<ApplicationAdditionalInfoItemEntity>();
+
+    public DbSet<ApplicationAttachmentEntity> ApplicationAttachments =>
+        Set<ApplicationAttachmentEntity>();
+
+    public DbSet<HalalCertificateEntity> HalalCertificates =>
+        Set<HalalCertificateEntity>();
+
+    public DbSet<CertificateItemEntity> CertificateItems =>
+        Set<CertificateItemEntity>();
 
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
@@ -1001,6 +1025,283 @@ public class VHSmartDbContext(
                 image.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
                 image.Property(f => f.SizeBytes).IsRequired();
             });
+        });
+
+        modelBuilder.Entity<BatchEntity>(entity =>
+        {
+            entity.ToTable("AppBatches");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.CbReferenceNo).HasMaxLength(100);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BrandId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ManufacturerSupplierId);
+            entity.HasOne<ManufacturerSupplierEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ManufacturerSupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, Name) among live rows (Database.md 10): "Error! Please provide
+            // unique batch name" - the handlers answer the friendly message instead of this.
+            entity.HasIndex(x => new { x.CompanyId, x.Name })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<BatchProductEntity>(entity =>
+        {
+            entity.ToTable("AppBatchProducts");
+            entity.HasKey(x => x.Id);
+            // Link/unlink toggles MappingStatus (Database.md 10), same as PrdProductIngredients.
+            entity.Property(x => x.MappingStatus).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BatchId);
+            entity.HasOne<BatchEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (BatchId, ProductId) among live rows (Database.md 10).
+            entity.HasIndex(x => new { x.BatchId, x.ProductId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<BatchPremiseEntity>(entity =>
+        {
+            entity.ToTable("AppBatchPremises");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BatchId);
+            entity.HasOne<BatchEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<PremiseEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (BatchId, PremiseId) among live rows (Database.md 10): unlinking soft-deletes
+            // so the slot frees for a re-link.
+            entity.HasIndex(x => new { x.BatchId, x.PremiseId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<ApplicationEntity>(entity =>
+        {
+            entity.ToTable("AppHalalApplications");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ReferenceNo).IsRequired().HasMaxLength(60);
+            entity.Property(x => x.ApplicationType).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(60);
+            entity.Property(x => x.CbApplicationNo).HasMaxLength(100);
+            entity.Property(x => x.HalalCoachName).HasMaxLength(200);
+            entity.Property(x => x.YearlySalesRevenue).HasMaxLength(100);
+            entity.Property(x => x.ProductMarket).HasMaxLength(20);
+            entity.Property(x => x.AckName).HasMaxLength(200);
+            entity.Property(x => x.AckEmail).HasMaxLength(254);
+            entity.Property(x => x.AckMobile).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BatchId);
+            entity.HasOne<BatchEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ ReferenceNo (Database.md 10): the D-09 generator hands out one number per
+            // prefix + scheme + date, so a collision means a bug, not a user mistake.
+            entity.HasIndex(x => x.ReferenceNo).IsUnique();
+        });
+
+        modelBuilder.Entity<ApplicationStatusHistoryEntity>(entity =>
+        {
+            entity.ToTable("AppApplicationStatusHistories");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.FromStatus).HasMaxLength(60);
+            entity.Property(x => x.ToStatus).IsRequired().HasMaxLength(60);
+            entity.Property(x => x.Remarks).HasMaxLength(500);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ApplicationAdditionalInfoItemEntity>(entity =>
+        {
+            entity.ToTable("AppApplicationAdditionalInfoItems");
+            entity.HasKey(x => x.Id);
+            // Section is an enum stored as string (Database.md "Enums"); the widest value
+            // today is "QualityControl".
+            entity.Property(x => x.Section).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.OptionCode).IsRequired().HasMaxLength(50);
+            entity.Property(x => x.FreeText).HasMaxLength(500);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ApplicationAttachmentEntity>(entity =>
+        {
+            entity.ToTable("AppApplicationAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.DocumentTypeId);
+            entity.HasOne(x => x.DocumentType)
+                .WithMany()
+                .HasForeignKey(x => x.DocumentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Required File group (Database.md 10 "Document File"): a row only exists once a
+            // file has been uploaded, exactly like the Raw Material attachment.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
+            });
+        });
+
+        modelBuilder.Entity<HalalCertificateEntity>(entity =>
+        {
+            entity.ToTable("AppHalalCertificates");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.CertificateNo).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, CertificateNo) among live rows (Database.md 10): one number
+            // identifies one certificate per company, whichever application holds it.
+            entity.HasIndex(x => new { x.CompanyId, x.CertificateNo })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+            // Document File is optional (Database.md 10 marks no asterisk): nullable owned
+            // columns, same shape as the minutes-meeting attachment document.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
+            });
+        });
+
+        modelBuilder.Entity<CertificateItemEntity>(entity =>
+        {
+            entity.ToTable("AppCertificateItems");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.ItemName).IsRequired().HasMaxLength(300);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<PremiseEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BrandId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.HalalCertificateId);
+            entity.HasOne<HalalCertificateEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.HalalCertificateId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

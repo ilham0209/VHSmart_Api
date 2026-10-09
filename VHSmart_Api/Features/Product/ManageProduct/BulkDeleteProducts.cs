@@ -45,6 +45,12 @@ public class BulkDeleteProductsHandler(VHSmartDbContext db, ICurrentUser user)
                 throw new NotFoundException("Product not found.");
         }
 
+        // The same in-use guard as the row delete (the toolbar must not free a product the
+        // row delete refuses); the check runs before anything is removed, so the batch stays
+        // all-or-nothing.
+        foreach (var entity in entities)
+            await ProductDeletionGuard.EnsureNotInUseAsync(db, entity.Id, ct);
+
         db.Products.RemoveRange(entities);
         await db.SaveChangesAsync(ct);
     }

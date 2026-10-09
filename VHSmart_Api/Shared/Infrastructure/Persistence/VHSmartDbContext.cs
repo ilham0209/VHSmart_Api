@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using VHSmart_Api.Shared.Domain;
 using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Companies;
+using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Infrastructure.Security;
@@ -75,6 +76,12 @@ public class VHSmartDbContext(
     public DbSet<ProductIngredientEntity> ProductIngredients => Set<ProductIngredientEntity>();
 
     public DbSet<ProductEntity> Products => Set<ProductEntity>();
+
+    public DbSet<BatchEntity> Batches => Set<BatchEntity>();
+
+    public DbSet<BatchProductEntity> BatchProducts => Set<BatchProductEntity>();
+
+    public DbSet<BatchPremiseEntity> BatchPremises => Set<BatchPremiseEntity>();
 
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
@@ -1001,6 +1008,99 @@ public class VHSmartDbContext(
                 image.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
                 image.Property(f => f.SizeBytes).IsRequired();
             });
+        });
+
+        modelBuilder.Entity<BatchEntity>(entity =>
+        {
+            entity.ToTable("AppBatches");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.CbReferenceNo).HasMaxLength(100);
+            entity.Property(x => x.Description).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SchemeId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BrandId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BrandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ManufacturerSupplierId);
+            entity.HasOne<ManufacturerSupplierEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ManufacturerSupplierId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (CompanyId, Name) among live rows (Database.md 10): "Error! Please provide
+            // unique batch name" - the handlers answer the friendly message instead of this.
+            entity.HasIndex(x => new { x.CompanyId, x.Name })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<BatchProductEntity>(entity =>
+        {
+            entity.ToTable("AppBatchProducts");
+            entity.HasKey(x => x.Id);
+            // Link/unlink toggles MappingStatus (Database.md 10), same as PrdProductIngredients.
+            entity.Property(x => x.MappingStatus).IsRequired().HasMaxLength(20);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BatchId);
+            entity.HasOne<BatchEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ProductId);
+            entity.HasOne<ProductEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ProductId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (BatchId, ProductId) among live rows (Database.md 10).
+            entity.HasIndex(x => new { x.BatchId, x.ProductId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<BatchPremiseEntity>(entity =>
+        {
+            entity.ToTable("AppBatchPremises");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.BatchId);
+            entity.HasOne<BatchEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.BatchId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<PremiseEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ (BatchId, PremiseId) among live rows (Database.md 10): unlinking soft-deletes
+            // so the slot frees for a re-link.
+            entity.HasIndex(x => new { x.BatchId, x.PremiseId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
         });
 
         modelBuilder.Entity<NotificationEntity>(entity =>

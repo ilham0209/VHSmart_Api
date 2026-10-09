@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using VHSmart_Api.Features.Product.ManageProduct;
+using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Exceptions;
 using static VHSmart_Api.Tests.Features.Product.ManageProduct.ProductTestData;
 
@@ -78,5 +79,75 @@ public class DeleteProductTests
         await Assert.ThrowsAsync<NotFoundException>(() =>
             new DeleteProductHandler(db, user)
                 .Handle(new DeleteProductCommand(id), CancellationToken.None));
+    }
+
+    // The "delete only when unused" guard deferred by PD-01 / PD-03 and landed with HA-01:
+    // a product a batch still holds cannot be freed (no spec message - ours).
+    [Fact]
+    public async Task Handle_ProductUsedByABatch_ThrowsBusinessRule()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var id = await SeedProductAsync(db);
+        await SeedBatchProductLinkAsync(db, id);
+
+        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            new DeleteProductHandler(db, user)
+                .Handle(new DeleteProductCommand(id), CancellationToken.None));
+
+        Assert.Equal("This product is used by a batch.", exception.Message);
+        Assert.False((await db.Products.IgnoreQueryFilters().SingleAsync()).IsDeleted);
+    }
+
+    [Fact]
+    public async Task Handle_ProductWithAnIngredientLink_ThrowsBusinessRule()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var id = await SeedProductAsync(db);
+        var rawMaterialId = await SeedRawMaterialAsync(db);
+        await SeedIngredientAsync(db, id, rawMaterialId);
+
+        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            new DeleteProductHandler(db, user)
+                .Handle(new DeleteProductCommand(id), CancellationToken.None));
+
+        Assert.Equal("This product is used by an ingredient link.", exception.Message);
+        Assert.False((await db.Products.IgnoreQueryFilters().SingleAsync()).IsDeleted);
+    }
+
+    [Fact]
+    public async Task Handle_ProductWithAnImage_ThrowsBusinessRule()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var id = await SeedProductAsync(db);
+        await SeedProductImageAsync(db, id, ProductImagePosition.Front);
+
+        var exception = await Assert.ThrowsAsync<BusinessRuleException>(() =>
+            new DeleteProductHandler(db, user)
+                .Handle(new DeleteProductCommand(id), CancellationToken.None));
+
+        Assert.Equal("This product is used by a product image.", exception.Message);
+        Assert.False((await db.Products.IgnoreQueryFilters().SingleAsync()).IsDeleted);
+    }
+
+    // CodingRules 7.2: only LIVE referencing rows block - an unlinked (soft-deleted) batch
+    // row does not hold the product back.
+    [Fact]
+    public async Task Handle_SoftDeletedBatchLink_DoesNotBlockTheDelete()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var id = await SeedProductAsync(db);
+        await SeedBatchProductLinkAsync(db, id, softDeleteLink: true);
+
+        // Same detach as the other delete tests: the handler tracks only its principal.
+        db.ChangeTracker.Clear();
+
+        await new DeleteProductHandler(db, user)
+            .Handle(new DeleteProductCommand(id), CancellationToken.None);
+
+        Assert.True((await db.Products.IgnoreQueryFilters().SingleAsync()).IsDeleted);
     }
 }

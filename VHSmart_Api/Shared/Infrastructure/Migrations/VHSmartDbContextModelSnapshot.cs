@@ -4883,6 +4883,185 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AudAuditTaskItems", (string)null);
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportAttachmentEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExternalAuditReportId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("ExternalAuditReportId");
+
+                    b.ToTable("AudExternalAuditReportAttachments", (string)null);
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationSchemeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("AuditDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("AuditReferenceNo")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("CbAuditReferenceNo")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("CbHalalApplicationNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("CertificationNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("OverallStatus")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("ReceivedFromCertificationBodyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<TimeSpan>("TimeIn")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan>("TimeOut")
+                        .HasColumnType("time");
+
+                    b.Property<string>("TypeOfApplication")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TypeOfInspection")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationSchemeId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("ReceivedFromCertificationBodyId");
+
+                    b.ToTable("AudExternalAuditReports", (string)null);
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportPremiseEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ExternalAuditReportId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("PremiseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("ExternalAuditReportId");
+
+                    b.HasIndex("PremiseId");
+
+                    b.HasIndex("CompanyId", "ExternalAuditReportId", "PremiseId")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("AudExternalAuditReportPremises", (string)null);
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.FindingEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5083,6 +5262,116 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasFilter("[IsDeleted] = 0");
 
                     b.ToTable("AudGroupAuditorMembers", (string)null);
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.NonConformanceEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuditReferenceNo")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid?>("AuditTaskItemId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Clause")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("ClosedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ClosedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DetailName")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("ExternalAuditReportId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Findings")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsFinal")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ItemName")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("NonConformanceDetails")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid?>("PremiseId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Status")
+                        .HasMaxLength(30)
+                        .HasColumnType("nvarchar(30)");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Tags")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuditTaskItemId");
+
+                    b.HasIndex("CategoryId");
+
+                    b.HasIndex("ClosedBy");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("ExternalAuditReportId");
+
+                    b.HasIndex("PremiseId");
+
+                    b.ToTable("AudNonConformances", (string)null);
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.RecommendationEntity", b =>
@@ -7915,6 +8204,97 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportAttachmentEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ExternalAuditReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Document", b1 =>
+                        {
+                            b1.Property<Guid>("ExternalAuditReportAttachmentEntityId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<string>("ContentType")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)");
+
+                            b1.Property<string>("FileName")
+                                .IsRequired()
+                                .HasMaxLength(260)
+                                .HasColumnType("nvarchar(260)");
+
+                            b1.Property<long>("SizeBytes")
+                                .HasColumnType("bigint");
+
+                            b1.Property<string>("StorageKey")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)");
+
+                            b1.HasKey("ExternalAuditReportAttachmentEntityId");
+
+                            b1.ToTable("AudExternalAuditReportAttachments");
+
+                            b1.WithOwner()
+                                .HasForeignKey("ExternalAuditReportAttachmentEntityId");
+                        });
+
+                    b.Navigation("Document")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.SchemeEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ApplicationSchemeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.CertificationBodyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivedFromCertificationBodyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportPremiseEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ExternalAuditReportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.PremiseEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PremiseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.FindingEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
@@ -7985,6 +8365,40 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.NonConformanceEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.AuditTaskItemEntity", null)
+                        .WithMany()
+                        .HasForeignKey("AuditTaskItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.UserEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ClosedBy")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.ExternalAuditReportEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ExternalAuditReportId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.PremiseEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PremiseId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.RecommendationEntity", b =>

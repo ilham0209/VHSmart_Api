@@ -59,6 +59,14 @@ public class VHSmartDbContext(
 
     public DbSet<AuditTaskItemEntity> AuditTaskItems => Set<AuditTaskItemEntity>();
 
+    public DbSet<ExternalAuditReportEntity> ExternalAuditReports => Set<ExternalAuditReportEntity>();
+
+    public DbSet<ExternalAuditReportPremiseEntity> ExternalAuditReportPremises => Set<ExternalAuditReportPremiseEntity>();
+
+    public DbSet<ExternalAuditReportAttachmentEntity> ExternalAuditReportAttachments => Set<ExternalAuditReportAttachmentEntity>();
+
+    public DbSet<NonConformanceEntity> NonConformances => Set<NonConformanceEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -603,6 +611,145 @@ public class VHSmartDbContext(
             entity.HasOne<AuditCriteriaEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.SourceAuditCriteriaId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExternalAuditReportEntity>(entity =>
+        {
+            entity.ToTable("AudExternalAuditReports");
+            entity.HasKey(x => x.Id);
+            // AuditReferenceNo stays nullable: the legacy "EXT-SUP/..." format is [VERIFY]
+            // with no Decisions.md default (Database.md 13 carries no *).
+            entity.Property(x => x.AuditReferenceNo).HasMaxLength(120);
+            entity.Property(x => x.CbAuditReferenceNo).IsRequired().HasMaxLength(120);
+            entity.Property(x => x.TypeOfApplication).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.TypeOfInspection).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.CbHalalApplicationNo).HasMaxLength(100);
+            entity.Property(x => x.CertificationNo).HasMaxLength(100);
+            entity.Property(x => x.AuditDate).HasColumnType("date");
+            entity.Property(x => x.Remarks).HasMaxLength(1000);
+            // D-10: fixed list Pass / Fail / Pending.
+            entity.Property(x => x.OverallStatus).HasMaxLength(50);
+            entity.Property(x => x.Status).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ReceivedFromCertificationBodyId);
+            entity.HasOne<CertificationBodyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ReceivedFromCertificationBodyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ApplicationSchemeId);
+            entity.HasOne<SchemeEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ApplicationSchemeId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExternalAuditReportPremiseEntity>(entity =>
+        {
+            entity.ToTable("AudExternalAuditReportPremises");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ExternalAuditReportId);
+            entity.HasOne<ExternalAuditReportEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ExternalAuditReportId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<PremiseEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // UQ among live rows so a re-save of the picker never duplicates a pair.
+            entity.HasIndex(x => new { x.CompanyId, x.ExternalAuditReportId, x.PremiseId })
+                .IsUnique()
+                .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<ExternalAuditReportAttachmentEntity>(entity =>
+        {
+            entity.ToTable("AudExternalAuditReportAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ExternalAuditReportId);
+            entity.HasOne<ExternalAuditReportEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ExternalAuditReportId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // File column group (Database.md 13): metadata only, bytes in IFileStorage.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+            });
+        });
+
+        modelBuilder.Entity<NonConformanceEntity>(entity =>
+        {
+            entity.ToTable("AudNonConformances");
+            entity.HasKey(x => x.Id);
+            // CodingRules 11: enum stored as its spec string.
+            entity.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.AuditReferenceNo).HasMaxLength(120);
+            entity.Property(x => x.ItemName).HasMaxLength(500);
+            entity.Property(x => x.DetailName).HasMaxLength(500);
+            entity.Property(x => x.Reference).HasMaxLength(200);
+            entity.Property(x => x.Clause).HasMaxLength(200);
+            entity.Property(x => x.Findings).HasMaxLength(2000);
+            entity.Property(x => x.NonConformanceDetails).HasMaxLength(2000);
+            entity.Property(x => x.Remarks).HasMaxLength(1000);
+            entity.Property(x => x.Tags).HasMaxLength(200);
+            // D-05: text constants Open / CorrectiveActionSubmitted / Closed.
+            entity.Property(x => x.Status).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AuditTaskItemId);
+            entity.HasOne<AuditTaskItemEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AuditTaskItemId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ExternalAuditReportId);
+            entity.HasOne<ExternalAuditReportEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ExternalAuditReportId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PremiseId);
+            entity.HasOne<PremiseEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PremiseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.CategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ClosedBy);
+            entity.HasOne<UserEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ClosedBy)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

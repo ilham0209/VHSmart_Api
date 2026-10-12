@@ -176,4 +176,81 @@ public class SubmitAuditTaskTests
             results.Errors,
             error => error.ErrorMessage == "Auditee Designation is required.");
     }
+
+    [Fact]
+    public async Task Submit_FlipsInternalNcsToFinal()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var (taskId, _, _, _, _) = await SeedStandardAuditAsync(
+            db, Guid.Parse(user.UserId), AuditTaskStatus.InProgress);
+        await AnswerAllItemsAsync(db, taskId, [2m, 3m, 1m]);
+        var internalNcId = await SeedInternalNcAsync(db, CompanyA, taskId, isFinal: false);
+
+        await Handler(db, user).Handle(
+            new SubmitAuditTaskCommand(taskId, "s", "n", "d"), CancellationToken.None);
+
+        var nc = await db.NonConformances.SingleAsync(row => row.Id == internalNcId);
+        Assert.True(nc.IsFinal);
+    }
+
+    [Fact]
+    public async Task Submit_ExternalNcsStayUnfinalized()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var (taskId, _, _, _, _) = await SeedStandardAuditAsync(
+            db, Guid.Parse(user.UserId), AuditTaskStatus.InProgress);
+        await AnswerAllItemsAsync(db, taskId, [2m, 3m, 1m]);
+        var externalNcId = await SeedExternalNcAsync(db, CompanyA);
+
+        await Handler(db, user).Handle(
+            new SubmitAuditTaskCommand(taskId, "s", "n", "d"), CancellationToken.None);
+
+        var nc = await db.NonConformances.SingleAsync(row => row.Id == externalNcId);
+        Assert.False(nc.IsFinal);
+    }
+
+    private static async Task<Guid> SeedInternalNcAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId,
+        Guid taskId,
+        bool isFinal)
+    {
+        var itemId = await db.AuditTaskItems
+            .Where(row => row.AuditTaskId == taskId)
+            .OrderBy(row => row.CategorySequence)
+            .ThenBy(row => row.CriteriaSequence)
+            .Select(row => row.Id)
+            .FirstAsync();
+        var row = new NonConformanceEntity
+        {
+            CompanyId = companyId,
+            Source = NonConformanceSource.Internal,
+            AuditTaskItemId = itemId,
+            Findings = "Pest traces behind the chiller.",
+            Status = NonConformanceStatus.Open,
+            IsFinal = isFinal
+        };
+        db.NonConformances.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
+
+    private static async Task<Guid> SeedExternalNcAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId)
+    {
+        var row = new NonConformanceEntity
+        {
+            CompanyId = companyId,
+            Source = NonConformanceSource.External,
+            NonConformanceDetails = "Pest traces found",
+            Status = NonConformanceStatus.Open,
+            IsFinal = false
+        };
+        db.NonConformances.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
 }

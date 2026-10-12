@@ -127,4 +127,116 @@ public class UpdateAuditTaskItemTests
             results.Errors,
             error => error.ErrorMessage == "Remarks cannot exceed 1000 characters.");
     }
+
+    [Fact]
+    public async Task Handle_NonConformingAnswer_CreatesInternalNc()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var (taskId, _, _, _, _) = await SeedStandardAuditAsync(db, Guid.Parse(user.UserId));
+        var itemId = await StartAndGetFirstItemAsync(db, user, taskId);
+
+        await Handler(db, user).Handle(
+            new UpdateAuditTaskItemCommand(
+                itemId, 2m, false, "Pest traces behind the chiller."),
+            CancellationToken.None);
+
+        var nc = await db.NonConformances.SingleAsync(row => row.AuditTaskItemId == itemId);
+        Assert.Equal(NonConformanceSource.Internal, nc.Source);
+        Assert.Equal(NonConformanceStatus.Open, nc.Status);
+        Assert.False(nc.IsFinal);
+        Assert.Equal("Pest traces behind the chiller.", nc.Findings);
+        Assert.Equal("SRN/STORE01/18-11-2026(1)", nc.AuditReferenceNo);
+        Assert.NotNull(nc.PremiseId);
+    }
+
+    [Fact]
+    public async Task Handle_Reanswer_UpdatesFindingsOnOpenNc()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var (taskId, _, _, _, _) = await SeedStandardAuditAsync(db, Guid.Parse(user.UserId));
+        var itemId = await StartAndGetFirstItemAsync(db, user, taskId);
+        var handler = Handler(db, user);
+
+        await handler.Handle(
+            new UpdateAuditTaskItemCommand(itemId, 2m, false, "First finding."),
+            CancellationToken.None);
+        await handler.Handle(
+            new UpdateAuditTaskItemCommand(itemId, 2m, false, "Refined finding."),
+            CancellationToken.None);
+
+        var nc = await db.NonConformances.SingleAsync(row => row.AuditTaskItemId == itemId);
+        Assert.Equal("Refined finding.", nc.Findings);
+        Assert.Equal(NonConformanceStatus.Open, nc.Status);
+    }
+
+    [Fact]
+    public async Task Handle_ReanswerOnClosedNc_LeavesNcUntouched()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var (taskId, _, _, _, _) = await SeedStandardAuditAsync(db, Guid.Parse(user.UserId));
+        var itemId = await StartAndGetFirstItemAsync(db, user, taskId);
+        var ncId = await SeedClosedInternalNcAsync(db, CompanyA, itemId);
+        var handler = Handler(db, user);
+
+        await handler.Handle(
+            new UpdateAuditTaskItemCommand(itemId, 2m, false, "New remark."), CancellationToken.None);
+
+        var nc = await db.NonConformances.SingleAsync(row => row.Id == ncId);
+        Assert.Equal("Original findings", nc.Findings);
+        Assert.Equal(NonConformanceStatus.Closed, nc.Status);
+    }
+
+    [Fact]
+    public async Task Handle_FlipToConforming_DoesNotRetractNc()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var (taskId, _, _, _, _) = await SeedStandardAuditAsync(db, Guid.Parse(user.UserId));
+        var itemId = await StartAndGetFirstItemAsync(db, user, taskId);
+        var handler = Handler(db, user);
+
+        await handler.Handle(
+            new UpdateAuditTaskItemCommand(itemId, 2m, false, "Finding."), CancellationToken.None);
+        await handler.Handle(
+            new UpdateAuditTaskItemCommand(itemId, 2m, true, null), CancellationToken.None);
+
+        var nc = await db.NonConformances.SingleAsync(row => row.AuditTaskItemId == itemId);
+        Assert.Equal(NonConformanceStatus.Open, nc.Status);
+    }
+
+    [Fact]
+    public async Task Handle_ConformingAnswer_CreatesNoNc()
+    {
+        var user = UserA();
+        var db = await CreateDbAsync(user);
+        var (taskId, _, _, _, _) = await SeedStandardAuditAsync(db, Guid.Parse(user.UserId));
+        var itemId = await StartAndGetFirstItemAsync(db, user, taskId);
+
+        await Handler(db, user).Handle(
+            new UpdateAuditTaskItemCommand(itemId, 2m, true, null), CancellationToken.None);
+
+        Assert.Equal(0, await db.NonConformances.CountAsync());
+    }
+
+    private static async Task<Guid> SeedClosedInternalNcAsync(
+        TestableVHSmartDbContext db,
+        Guid companyId,
+        Guid itemId)
+    {
+        var row = new NonConformanceEntity
+        {
+            CompanyId = companyId,
+            Source = NonConformanceSource.Internal,
+            AuditTaskItemId = itemId,
+            Findings = "Original findings",
+            Status = NonConformanceStatus.Closed,
+            ClosedAt = DateTime.UtcNow
+        };
+        db.NonConformances.Add(row);
+        await db.SaveChangesAsync();
+        return row.Id;
+    }
 }

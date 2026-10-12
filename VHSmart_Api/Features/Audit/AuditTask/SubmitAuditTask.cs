@@ -16,7 +16,11 @@ namespace VHSmart_Api.Features.Audit.AuditTask;
 // row must carry an Actual Point first - the flow says the auditor answers every row
 // (message ours, flagged); D-06 then computes Audit Score = Sum(Actual)/Sum(Potential)x100
 // (2 dp; unanswered would count as 0 but they cannot exist here). Final Review Score stays
-// 0.00 until Final Points are entered. Feeds NC list / Generate Report are later tasks.
+// 0.00 until Final Points are entered. NC feed (AU-10): submit flips the task's Internal
+// NCs to IsFinal so they surface on the Final Non Conformance List - the glossary
+// ("after findings are finalized") points at submit because Completed locks the audit
+// ([VERIFY] no explicit trigger in the spec; external NCs are not flipped - their
+// finalize point is undefined, flagged). Generate Report is a later task.
 public record SubmitAuditTaskCommand(
     Guid Id,
     string Summary,
@@ -88,6 +92,18 @@ public class SubmitAuditTaskHandler(VHSmartDbContext db, ICurrentUser user)
         task.Status = AuditTaskStatus.Completed;
         task.EndAuditDate = now.Date;
         task.TimeOut = now.TimeOfDay;
+
+        var itemIds = items.Select(item => item.Id).ToList();
+        var internalNcs = await db.NonConformances
+            .Where(row => row.Source == NonConformanceSource.Internal
+                && row.AuditTaskItemId != null
+                && itemIds.Contains(row.AuditTaskItemId.Value)
+                && row.CompanyId == user.CompanyId)
+            .ToListAsync(ct);
+        foreach (var nc in internalNcs)
+        {
+            nc.IsFinal = true;
+        }
 
         await db.SaveChangesAsync(ct);
     }

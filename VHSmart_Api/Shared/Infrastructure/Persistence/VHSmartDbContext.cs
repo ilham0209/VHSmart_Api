@@ -67,6 +67,8 @@ public class VHSmartDbContext(
 
     public DbSet<NonConformanceEntity> NonConformances => Set<NonConformanceEntity>();
 
+    public DbSet<CorrectiveActionEntryEntity> CorrectiveActionEntries => Set<CorrectiveActionEntryEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -751,6 +753,41 @@ public class VHSmartDbContext(
                 .WithMany()
                 .HasForeignKey(x => x.ClosedBy)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CorrectiveActionEntryEntity>(entity =>
+        {
+            entity.ToTable("AudCorrectiveActionEntries");
+            entity.HasKey(x => x.Id);
+            // CodingRules 11: enum stored as its spec string.
+            entity.Property(x => x.FilledBy).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Details).HasMaxLength(2000);
+            entity.Property(x => x.Comment).HasMaxLength(2000);
+            // D-05: text constants Open / CorrectiveActionSubmitted / Closed.
+            entity.Property(x => x.StatusSet).HasMaxLength(30);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.NonConformanceId);
+            entity.HasOne<NonConformanceEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.NonConformanceId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.FilledByUserId);
+            entity.HasOne(x => x.FilledByUser)
+                .WithMany()
+                .HasForeignKey(x => x.FilledByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.OwnsOne(x => x.Attachment, document =>
+            {
+                document.Property(f => f.FileName).HasMaxLength(260);
+                document.Property(f => f.StorageKey).HasMaxLength(100);
+                document.Property(f => f.ContentType).HasMaxLength(100);
+            });
         });
 
         modelBuilder.Entity<CertificationBodyEntity>(entity =>

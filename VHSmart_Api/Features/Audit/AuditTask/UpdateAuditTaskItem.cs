@@ -11,11 +11,14 @@ namespace VHSmart_Api.Features.Audit.AuditTask;
 // Answer one checklist row (spec 14.9 flow step 3 / tab "Audit Checklist"): the auditor
 // edits Actual Point (required - the score input of D-06) plus the optional Conformance
 // flag and Remarks. How Conformance Yes/No is entered and what the red X mean is [VERIFY]
-// in the spec, so IsConforming is a plain optional bool, never derived - the later NC
-// feed (AU-10) will read it. Actual Point above Potential Point is not ruled out ([VERIFY],
-// not invented). Only while the task is InProgress; Completed is locked ([CONFIRMED]),
-// NotStarted is a 409 (start first). Final Point is NOT editable here - D-06 gives it to
-// the post-completion Final Review endpoint.
+// in the spec, so IsConforming is a plain optional bool, never derived. NC feed (AU-10,
+// Database.md 13): answering non-conforming raises one Internal NC per item (create-once;
+// a re-answer refreshes Findings unless the NC is Closed - D-05 no reopen; flipping back
+// to conforming does NOT retract the NC - flagged, closing is the auditor's job). Actual
+// Point above Potential Point is not ruled out ([VERIFY], not invented). Only while the
+// task is InProgress; Completed is locked ([CONFIRMED]), NotStarted is a 409 (start
+// first). Final Point is NOT editable here - D-06 gives it to the post-completion Final
+// Review endpoint.
 public record UpdateAuditTaskItemCommand(
     Guid Id,
     decimal? ActualPoint,
@@ -80,6 +83,34 @@ public class UpdateAuditTaskItemHandler(VHSmartDbContext db, ICurrentUser user)
         item.ActualPoint = request.ActualPoint;
         item.IsConforming = request.IsConforming;
         item.Remarks = request.Remarks;
+
+        if (request.IsConforming == false)
+        {
+            var nc = await db.NonConformances
+                .FirstOrDefaultAsync(
+                    row => row.AuditTaskItemId == item.Id
+                        && row.Source == NonConformanceSource.Internal
+                        && row.CompanyId == user.CompanyId,
+                    ct);
+            if (nc is null)
+            {
+                db.NonConformances.Add(new NonConformanceEntity
+                {
+                    CompanyId = user.CompanyId,
+                    Source = NonConformanceSource.Internal,
+                    AuditReferenceNo = plan.AuditReferenceNo,
+                    AuditTaskItemId = item.Id,
+                    PremiseId = plan.PremiseId,
+                    Reference = item.Reference,
+                    Findings = request.Remarks,
+                    Status = NonConformanceStatus.Open
+                });
+            }
+            else if (nc.Status != NonConformanceStatus.Closed)
+            {
+                nc.Findings = request.Remarks;
+            }
+        }
 
         await db.SaveChangesAsync(ct);
     }

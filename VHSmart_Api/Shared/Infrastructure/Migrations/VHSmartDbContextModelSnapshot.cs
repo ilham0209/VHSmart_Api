@@ -4720,6 +4720,85 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AudAuditPrefixes", (string)null);
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditTaskEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AuditPlanId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AuditScore")
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<string>("AuditeeDesignation")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("AuditeeName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("EndAuditDate")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("FinalReviewScore")
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ReportingTo")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("StartAuditDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<string>("Summary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<TimeSpan?>("TimeIn")
+                        .HasColumnType("time");
+
+                    b.Property<TimeSpan?>("TimeOut")
+                        .HasColumnType("time");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuditPlanId")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId");
+
+                    b.ToTable("AudAuditTasks", (string)null);
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.FindingEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7707,6 +7786,21 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
                         .WithMany()
                         .HasForeignKey("BrandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditTaskEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.AuditPlanEntity", null)
+                        .WithMany()
+                        .HasForeignKey("AuditPlanId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 

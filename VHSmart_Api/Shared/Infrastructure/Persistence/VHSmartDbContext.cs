@@ -55,6 +55,8 @@ public class VHSmartDbContext(
 
     public DbSet<GroupAuditorMemberEntity> GroupAuditorMembers => Set<GroupAuditorMemberEntity>();
 
+    public DbSet<AuditTaskEntity> AuditTasks => Set<AuditTaskEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -536,6 +538,37 @@ public class VHSmartDbContext(
             entity.HasIndex(x => new { x.CompanyId, x.GroupAuditorId, x.UserId })
                 .IsUnique()
                 .HasFilter("[IsDeleted] = 0");
+        });
+
+        modelBuilder.Entity<AuditTaskEntity>(entity =>
+        {
+            entity.ToTable("AudAuditTasks");
+            entity.HasKey(x => x.Id);
+            // CodingRules 11: enum stored as its spec string.
+            entity.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.StartAuditDate).HasColumnType("date");
+            entity.Property(x => x.EndAuditDate).HasColumnType("date");
+            // Database.md 13: score columns are decimal(6,2); app-level default 0.00 - the
+            // house bans HasDefaultValue (explicit-0 pitfall).
+            entity.Property(x => x.AuditScore).HasColumnType("decimal(6,2)");
+            entity.Property(x => x.FinalReviewScore).HasColumnType("decimal(6,2)");
+            entity.Property(x => x.Summary).HasMaxLength(2000);
+            entity.Property(x => x.AuditeeName).HasMaxLength(200);
+            entity.Property(x => x.AuditeeDesignation).HasMaxLength(200);
+            entity.Property(x => x.ReportingTo).HasMaxLength(200);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Database.md 13: "AuditPlanId* -> AudAuditPlans (1:1, UQ)".
+            entity.HasIndex(x => x.AuditPlanId).IsUnique();
+            entity.HasOne<AuditPlanEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AuditPlanId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<CertificationBodyEntity>(entity =>

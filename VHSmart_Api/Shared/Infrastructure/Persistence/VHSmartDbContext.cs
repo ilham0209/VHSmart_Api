@@ -6,6 +6,7 @@ using VHSmart_Api.Shared.Domain.Admin;
 using VHSmart_Api.Shared.Domain.Audit;
 using VHSmart_Api.Shared.Domain.Companies;
 using VHSmart_Api.Shared.Domain.HalalApplication;
+using VHSmart_Api.Shared.Domain.Payment;
 using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
 using VHSmart_Api.Shared.Infrastructure.Security;
@@ -142,6 +143,11 @@ public class VHSmartDbContext(
 
     public DbSet<CertificateItemEntity> CertificateItems =>
         Set<CertificateItemEntity>();
+
+    public DbSet<PaymentEntity> Payments => Set<PaymentEntity>();
+
+    public DbSet<PaymentAttachmentEntity> PaymentAttachments =>
+        Set<PaymentAttachmentEntity>();
 
     public DbSet<RawMaterialAccessibleCompanyEntity> RawMaterialAccessibleCompanies =>
         Set<RawMaterialAccessibleCompanyEntity>();
@@ -2401,6 +2407,81 @@ public class VHSmartDbContext(
                 .HasForeignKey(x => x.PackageId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+
+        // Payment > Certificate / Other (spec 15, Database.md 12): ONE tenant table mapped
+        // TPH - the discriminator column carries PaymentType ("Certificate" today, "Other"
+        // when PY-02 adds its derived type). CB / scheme / brand are read through
+        // HalalApplicationId, never copied (Database.md 12 note).
+        modelBuilder.Entity<PaymentEntity>(entity =>
+        {
+            entity.ToTable("PayPayments");
+            entity.HasKey(x => x.Id);
+            entity.HasDiscriminator<string>("PaymentType")
+                .HasValue<CertificatePaymentEntity>("Certificate");
+            entity.Property(x => x.Status).IsRequired().HasMaxLength(60);
+            entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(x => x.ReferenceNo).HasMaxLength(100);
+            entity.Property(x => x.BankName).HasMaxLength(200);
+            entity.Property(x => x.BankAccountNo).HasMaxLength(50);
+            entity.Property(x => x.PaymentVoucherNo).HasMaxLength(50);
+            entity.Property(x => x.SubmittedDate).IsRequired().HasColumnType("date");
+            entity.Property(x => x.ReceivedDate).IsRequired().HasColumnType("date");
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.SubmittedByStaffId);
+            entity.HasOne<StaffEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SubmittedByStaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.ReceivedByStaffId);
+            entity.HasOne<StaffEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ReceivedByStaffId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<CertificatePaymentEntity>(entity =>
+        {
+            entity.Property(x => x.HalalApplicationId).IsRequired();
+            entity.HasIndex(x => x.HalalApplicationId);
+            entity.HasOne<ApplicationEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.HalalApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<PaymentAttachmentEntity>(entity =>
+        {
+            entity.ToTable("PayPaymentAttachments");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.DocumentType).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.PaymentId);
+            entity.HasOne<PaymentEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PaymentId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Required File group (Database.md 12 "Document File"): a row only exists once a
+            // file has been uploaded, exactly like the application attachment.
+            entity.OwnsOne(x => x.Document, document =>
+            {
+                document.Property(f => f.FileName).IsRequired().HasMaxLength(260);
+                document.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
+                document.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
+                document.Property(f => f.SizeBytes).IsRequired();
+            });
+        });
     }
 
     private void ApplyAuditAndSoftDelete()
@@ -2458,7 +2539,11 @@ public class VHSmartDbContext(
     {
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())
         {
-            if (entityType.IsOwned() || !typeof(BaseClass).IsAssignableFrom(entityType.ClrType))
+            // TPH derived types (PaymentEntity's children) inherit the root's filter -
+            // EF Core rejects a filter on anything but the root entity type.
+            if (entityType.IsOwned()
+                || entityType.BaseType != null
+                || !typeof(BaseClass).IsAssignableFrom(entityType.ClrType))
                 continue;
 
             // RawMaterials and PrdMenus carry the special "Accessible For" rule of CodingRules

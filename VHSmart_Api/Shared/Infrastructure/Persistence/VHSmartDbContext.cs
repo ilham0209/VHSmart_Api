@@ -57,6 +57,8 @@ public class VHSmartDbContext(
 
     public DbSet<AuditTaskEntity> AuditTasks => Set<AuditTaskEntity>();
 
+    public DbSet<AuditTaskItemEntity> AuditTaskItems => Set<AuditTaskItemEntity>();
+
     public DbSet<CertificationBodyEntity> CertificationBodies => Set<CertificationBodyEntity>();
 
     public DbSet<CompanyBrandEntity> CompanyBrands => Set<CompanyBrandEntity>();
@@ -568,6 +570,39 @@ public class VHSmartDbContext(
             entity.HasOne<AuditPlanEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.AuditPlanId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AuditTaskItemEntity>(entity =>
+        {
+            entity.ToTable("AudAuditTaskItems");
+            entity.HasKey(x => x.Id);
+            // Frozen snapshot columns of the checklist at Start Audit (spec 14.9, Database.md 13).
+            entity.Property(x => x.Category).IsRequired().HasMaxLength(200);
+            entity.Property(x => x.Criteria).IsRequired().HasMaxLength(500);
+            entity.Property(x => x.SubCriteria).HasMaxLength(500);
+            entity.Property(x => x.Reference).HasMaxLength(200);
+            entity.Property(x => x.PotentialPoint).HasColumnType("decimal(6,2)");
+            entity.Property(x => x.ActualPoint).HasColumnType("decimal(6,2)");
+            entity.Property(x => x.FinalPoint).HasColumnType("decimal(6,2)");
+            entity.Property(x => x.Remarks).HasMaxLength(1000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            entity.HasIndex(x => x.CompanyId);
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => x.AuditTaskId);
+            entity.HasOne<AuditTaskEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.AuditTaskId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Traceability only - the snapshot columns stand alone if the source is edited later.
+            entity.HasIndex(x => x.SourceAuditCriteriaId);
+            entity.HasOne<AuditCriteriaEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.SourceAuditCriteriaId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

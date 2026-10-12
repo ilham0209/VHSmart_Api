@@ -4799,6 +4799,90 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AudAuditTasks", (string)null);
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditTaskItemEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal?>("ActualPoint")
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<Guid>("AuditTaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("CategorySequence")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Criteria")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("CriteriaSequence")
+                        .HasColumnType("int");
+
+                    b.Property<decimal?>("FinalPoint")
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<bool?>("IsConforming")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<decimal>("PotentialPoint")
+                        .HasColumnType("decimal(6,2)");
+
+                    b.Property<string>("Reference")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("Remarks")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("SourceAuditCriteriaId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SubCriteria")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuditTaskId");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("SourceAuditCriteriaId");
+
+                    b.ToTable("AudAuditTaskItems", (string)null);
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.FindingEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7809,6 +7893,26 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.AuditTaskItemEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.AuditTaskEntity", null)
+                        .WithMany()
+                        .HasForeignKey("AuditTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Audit.AuditCriteriaEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SourceAuditCriteriaId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Audit.FindingEntity", b =>

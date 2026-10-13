@@ -99,3 +99,14 @@ public class CertificatePaymentEntity : PaymentEntity
 
     public DateOnly? ChargeLetterDate { get; set; }
 }
+
+// The Other-only columns of Database.md 12 (spec 15.2): Payment Category* is a General Data
+// row of Group PAYMENT / Category "Payment Category" and Payee* is a Service Provider of the
+// same company. Both are links, not copies - the list and form read the category name and
+// the payee's bank details through them.
+public class OtherPaymentEntity : PaymentEntity
+{
+    public Guid PaymentCategoryId { get; set; }
+
+    public Guid ServiceProviderId { get; set; }
+}

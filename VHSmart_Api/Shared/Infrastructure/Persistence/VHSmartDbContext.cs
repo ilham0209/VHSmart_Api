@@ -2409,15 +2409,16 @@ public class VHSmartDbContext(
         });
 
         // Payment > Certificate / Other (spec 15, Database.md 12): ONE tenant table mapped
-        // TPH - the discriminator column carries PaymentType ("Certificate" today, "Other"
-        // when PY-02 adds its derived type). CB / scheme / brand are read through
-        // HalalApplicationId, never copied (Database.md 12 note).
+        // TPH - the discriminator column carries PaymentType ("Certificate" / "Other"). CB /
+        // scheme / brand are read through HalalApplicationId, never copied (Database.md 12
+        // note); the Other screen reads its category and payee the same way.
         modelBuilder.Entity<PaymentEntity>(entity =>
         {
             entity.ToTable("PayPayments");
             entity.HasKey(x => x.Id);
             entity.HasDiscriminator<string>("PaymentType")
-                .HasValue<CertificatePaymentEntity>("Certificate");
+                .HasValue<CertificatePaymentEntity>("Certificate")
+                .HasValue<OtherPaymentEntity>("Other");
             entity.Property(x => x.Status).IsRequired().HasMaxLength(60);
             entity.Property(x => x.Amount).HasColumnType("decimal(18,2)");
             entity.Property(x => x.ReferenceNo).HasMaxLength(100);
@@ -2452,6 +2453,22 @@ public class VHSmartDbContext(
             entity.HasOne<ApplicationEntity>()
                 .WithMany()
                 .HasForeignKey(x => x.HalalApplicationId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OtherPaymentEntity>(entity =>
+        {
+            entity.Property(x => x.PaymentCategoryId).IsRequired();
+            entity.HasIndex(x => x.PaymentCategoryId);
+            entity.HasOne<GeneralDataEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.PaymentCategoryId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.ServiceProviderId).IsRequired();
+            entity.HasIndex(x => x.ServiceProviderId);
+            entity.HasOne<ServiceProviderEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.ServiceProviderId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

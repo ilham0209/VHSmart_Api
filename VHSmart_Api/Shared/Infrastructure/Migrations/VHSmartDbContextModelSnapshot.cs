@@ -7948,6 +7948,23 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.HasDiscriminator().HasValue("Certificate");
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.OtherPaymentEntity", b =>
+                {
+                    b.HasBaseType("VHSmart_Api.Shared.Domain.Payment.PaymentEntity");
+
+                    b.Property<Guid>("PaymentCategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ServiceProviderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasIndex("PaymentCategoryId");
+
+                    b.HasIndex("ServiceProviderId");
+
+                    b.HasDiscriminator().HasValue("Other");
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CertificationBodyEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Admin.CountryEntity", null)
@@ -9899,6 +9916,21 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.HasOne("VHSmart_Api.Shared.Domain.HalalApplication.ApplicationEntity", null)
                         .WithMany()
                         .HasForeignKey("HalalApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.OtherPaymentEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.ServiceProviderEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceProviderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

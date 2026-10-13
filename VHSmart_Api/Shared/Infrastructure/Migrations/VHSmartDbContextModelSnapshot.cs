@@ -7067,6 +7067,133 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("AppHalalCertificates", (string)null);
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.PaymentAttachmentEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DocumentType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("PaymentId");
+
+                    b.ToTable("PayPaymentAttachments", (string)null);
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.PaymentEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("BankAccountNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("BankName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PaymentType")
+                        .IsRequired()
+                        .HasMaxLength(13)
+                        .HasColumnType("nvarchar(13)");
+
+                    b.Property<string>("PaymentVoucherNo")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("ReceivedByStaffId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("ReceivedDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("ReferenceNo")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<Guid>("SubmittedByStaffId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateOnly>("SubmittedDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("ReceivedByStaffId");
+
+                    b.HasIndex("SubmittedByStaffId");
+
+                    b.ToTable("PayPayments", (string)null);
+
+                    b.HasDiscriminator<string>("PaymentType").HasValue("PaymentEntity");
+
+                    b.UseTphMappingStrategy();
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuAccessibleCompanyEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7801,6 +7928,41 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasFilter("[IsDeleted] = 0 AND [IngredientCode] IS NOT NULL");
 
                     b.ToTable("RawMaterials", (string)null);
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.CertificatePaymentEntity", b =>
+                {
+                    b.HasBaseType("VHSmart_Api.Shared.Domain.Payment.PaymentEntity");
+
+                    b.Property<DateOnly?>("ChargeLetterDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("DateHalalApplication")
+                        .HasColumnType("date");
+
+                    b.Property<Guid>("HalalApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasIndex("HalalApplicationId");
+
+                    b.HasDiscriminator().HasValue("Certificate");
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.OtherPaymentEntity", b =>
+                {
+                    b.HasBaseType("VHSmart_Api.Shared.Domain.Payment.PaymentEntity");
+
+                    b.Property<Guid>("PaymentCategoryId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ServiceProviderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasIndex("PaymentCategoryId");
+
+                    b.HasIndex("ServiceProviderId");
+
+                    b.HasDiscriminator().HasValue("Other");
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Admin.CertificationBodyEntity", b =>
@@ -9334,6 +9496,76 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.Navigation("Document");
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.PaymentAttachmentEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Payment.PaymentEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.OwnsOne("VHSmart_Api.Shared.Domain.StoredFile", "Document", b1 =>
+                        {
+                            b1.Property<Guid>("PaymentAttachmentEntityId")
+                                .HasColumnType("uniqueidentifier");
+
+                            b1.Property<string>("ContentType")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)");
+
+                            b1.Property<string>("FileName")
+                                .IsRequired()
+                                .HasMaxLength(260)
+                                .HasColumnType("nvarchar(260)");
+
+                            b1.Property<long>("SizeBytes")
+                                .HasColumnType("bigint");
+
+                            b1.Property<string>("StorageKey")
+                                .IsRequired()
+                                .HasMaxLength(100)
+                                .HasColumnType("nvarchar(100)");
+
+                            b1.HasKey("PaymentAttachmentEntityId");
+
+                            b1.ToTable("PayPaymentAttachments");
+
+                            b1.WithOwner()
+                                .HasForeignKey("PaymentAttachmentEntityId");
+                        });
+
+                    b.Navigation("Document")
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.PaymentEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.StaffEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ReceivedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.StaffEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SubmittedByStaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Product.MenuAccessibleCompanyEntity", b =>
                 {
                     b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
@@ -9675,6 +9907,30 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.HasOne("VHSmart_Api.Shared.Domain.RawMaterial.ManufacturerSupplierEntity", null)
                         .WithMany()
                         .HasForeignKey("ManufacturerSupplierId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.CertificatePaymentEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.HalalApplication.ApplicationEntity", null)
+                        .WithMany()
+                        .HasForeignKey("HalalApplicationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.OtherPaymentEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.GeneralDataEntity", null)
+                        .WithMany()
+                        .HasForeignKey("PaymentCategoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.ServiceProviderEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceProviderId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

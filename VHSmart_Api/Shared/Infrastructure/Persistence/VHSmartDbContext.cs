@@ -9,6 +9,7 @@ using VHSmart_Api.Shared.Domain.HalalApplication;
 using VHSmart_Api.Shared.Domain.Payment;
 using VHSmart_Api.Shared.Domain.Product;
 using VHSmart_Api.Shared.Domain.RawMaterial;
+using VHSmart_Api.Shared.Domain.Support;
 using VHSmart_Api.Shared.Infrastructure.Security;
 
 namespace VHSmart_Api.Shared.Infrastructure.Persistence;
@@ -188,6 +189,9 @@ public class VHSmartDbContext(
     public DbSet<UserTokenEntity> UserTokens => Set<UserTokenEntity>();
 
     public DbSet<WebLinkEntity> WebLinks => Set<WebLinkEntity>();
+
+    // Support > Feedback (spec 17.2): store only, routing is HOLD - owner.
+    public DbSet<SupFeedbackEntity> Feedbacks => Set<SupFeedbackEntity>();
 
     public override int SaveChanges()
     {
@@ -2331,6 +2335,32 @@ public class VHSmartDbContext(
                 icon.Property(f => f.StorageKey).IsRequired().HasMaxLength(100);
                 icon.Property(f => f.ContentType).IsRequired().HasMaxLength(100);
             });
+        });
+
+        modelBuilder.Entity<SupFeedbackEntity>(entity =>
+        {
+            entity.ToTable("SupFeedbacks");
+            entity.HasKey(x => x.Id);
+            // CodingRules 11: enum stored as its Database.md string, e.g. "Enquiry".
+            entity.Property(x => x.Category).IsRequired().HasConversion<string>().HasMaxLength(20);
+            entity.Property(x => x.Details).IsRequired().HasMaxLength(4000);
+            entity.Property(x => x.SysUserCreated).IsRequired().HasMaxLength(100);
+            entity.Property(x => x.SysUserModified).HasMaxLength(100);
+            // Tenant table (Database.md 3): CompanyId from the JWT; indexed because the global
+            // query filter runs on every read.
+            entity.HasIndex(x => x.CompanyId);
+            // ERD edge SupFeedback }o--|| Company_Tenant, wired with C-01.
+            entity.HasOne<CompanyEntity>()
+                .WithMany()
+                .HasForeignKey(x => x.CompanyId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // The submitter (Database.md 3 UserId_): audit only - the feedback row itself is
+            // never edited (store only, spec 17.2), so deleting the user keeps its history.
+            entity.HasIndex(x => x.UserId);
+            entity.HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<SupportingDocumentEntity>(entity =>

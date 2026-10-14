@@ -7930,6 +7930,55 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                     b.ToTable("RawMaterials", (string)null);
                 });
 
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Support.SupFeedbackEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Details")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("SysDateCreated")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("SysDateModified")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("SysUserCreated")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("SysUserModified")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("SupFeedbacks", (string)null);
+                });
+
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.CertificatePaymentEntity", b =>
                 {
                     b.HasBaseType("VHSmart_Api.Shared.Domain.Payment.PaymentEntity");
@@ -9909,6 +9958,23 @@ namespace VHSmart_Api.Shared.Infrastructure.Migrations
                         .HasForeignKey("ManufacturerSupplierId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("VHSmart_Api.Shared.Domain.Support.SupFeedbackEntity", b =>
+                {
+                    b.HasOne("VHSmart_Api.Shared.Domain.Companies.CompanyEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("VHSmart_Api.Shared.Domain.Admin.UserEntity", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("VHSmart_Api.Shared.Domain.Payment.CertificatePaymentEntity", b =>
